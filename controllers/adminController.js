@@ -1,4 +1,5 @@
-import User from '../models/User.js';
+import User from "../models/User.js";
+
 
 export const dashboard = async (req, res) => {
   res.json({ message: "Welcome to Admin Dashboard" });
