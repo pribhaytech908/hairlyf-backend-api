@@ -6,6 +6,7 @@ import {
   verifyOTP,
   forgotPassword,
   resetPassword,
+  logout,
 } from '../controllers/authController.js';
 
 const router = express.Router();
@@ -183,5 +184,5 @@ router.post('/forgot-password', forgotPassword);
  *         description: Invalid or expired token
  */
 router.put('/reset-password/:token', resetPassword);
-
+router.post('/logout', logout);
 export default router;
