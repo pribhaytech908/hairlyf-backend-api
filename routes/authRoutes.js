@@ -184,5 +184,43 @@ router.post('/forgot-password', forgotPassword);
  *         description: Invalid or expired token
  */
 router.put('/reset-password/:token', resetPassword);
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout the user
+ *     tags: [Auth]
+ *     description: Logs out the authenticated user by clearing their session or token.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully logged out
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: User logged out successfully
+ *       401:
+ *         description: Unauthorized - User not logged in or token invalid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Unauthorized
+ */
 router.post('/logout', logout);
 export default router;
