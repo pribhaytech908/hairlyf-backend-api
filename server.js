@@ -19,16 +19,17 @@ config(); // Load .env
 connectDB(); // Connect MongoDB
 
 const app = express();
-const corsOptions = {
-  origin: 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-};
+app.use(cors(corsOptions));
 // Middlewares
 app.use(cors());
 app.use(json());
 app.use(cookieParser());
-
+const corsOptions = {
+  origin: ['http://localhost:5173', 'https://your-frontend-site.com'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
 // Routes
 app.get('/', (req, res) => {
   res.send('API is running...');
