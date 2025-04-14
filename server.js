@@ -24,7 +24,7 @@ const app = express();
 const corsOptions = {
   origin: [
     'http://localhost:5173',
-    'https://your-frontend-domain.com',
+    'https://hairlyf-backend-api.onrender.com',
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],

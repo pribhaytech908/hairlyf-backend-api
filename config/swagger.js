@@ -11,6 +11,9 @@ const options = {
     },
     servers: [
       {
+        url: 'https://hairlyf-backend-api.onrender.com',
+      },
+      {
         url: 'http://localhost:5000',
       },
     ],
