@@ -6,7 +6,7 @@ import { sendEmail } from '../utils/sendEmail.js';
 import crypto from 'crypto';
 const generateToken = (user) => {
   return jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-    expiresIn: '7d',
+    expiresIn: '2m',
   });
 };
 
