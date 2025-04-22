@@ -6,7 +6,8 @@ import {
   verifyOTP,
   forgotPassword,
   resetPassword,
-  logout,
+  getUser,
+  logoutUser,
 } from '../controllers/authController.js';
 
 const router = express.Router();
@@ -222,5 +223,44 @@ router.put('/reset-password/:token', resetPassword);
  *                   type: string
  *                   example: Unauthorized
  */
-router.post('/logout', logout);
+router.post('/logout', logoutUser);
+
+
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get the authenticated user's details
+ *     tags: [Auth]
+ *     description: Returns the currently logged-in user's profile if a valid cookie token is present.
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved user details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                       example: "64fa2ed45678e2016c6f7a1c"
+ *                     name:
+ *                       type: string
+ *                       example: John Doe
+ *                     email:
+ *                       type: string
+ *                       example: johndoe@example.com
+ *                     role:
+ *                       type: string
+ *                       example: user
+ *       401:
+ *         description: Unauthorized - Token missing or invalid
+ *       404:
+ *         description: User not found
+ */
+router.get("/me", getUser);
+
 export default router;

@@ -6,45 +6,38 @@ import { sendEmail } from '../utils/sendEmail.js';
 import crypto from 'crypto';
 const generateToken = (user) => {
   return jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-    expiresIn: '2m',
+    expiresIn: '7D',
   });
 };
 
 export const registerUser = async (req, res) => {
-  try {
-    const { name, email, password, phone } = req.body;
+  const { name, email, phone, password } = req.body;
 
-    let user = await User.findOne({ $or: [{ email }, { phone }] });
-    if (user) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
+  const userExists = await User.findOne({ email });
+  if (userExists) return res.status(400).json({ message: "User already exists" });
 
-    user = await User.create({ name, email, password, phone });
+  const user = await User.create({ name, email, phone, password });
 
-    // Send welcome email
-    const htmlContent = `
-      <h2>Welcome to our Ecommerce App, ${name}!</h2>
-      <p>Your account has been successfully created.</p>
-      <p>We're excited to have you onboard! 🎉</p>
-    `;
+  const verificationToken = crypto.randomBytes(32).toString("hex");
+  const hashedToken = crypto.createHash("sha256").update(verificationToken).digest("hex");
 
-    await sendEmail(email, 'Welcome to Ecommerce App 🎉', htmlContent);
+  user.verificationToken = hashedToken;
+  user.verificationTokenExpire = Date.now() + 10 * 60 * 1000;
+  await user.save();
 
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  const verifyURL = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+  const message = `
+    <h2>Hi ${user.name},</h2>
+    <p>Please verify your email by clicking the link below:</p>
+    <a href="${verifyURL}" target="_blank">Verify Email</a>
+    <p>This link will expire in 10 minutes.</p>
+  `;
+
+  await sendEmail(user.email, "Email Verification", message);
+
+  res.status(201).json({ message: "User registered. Verification email sent." });
 };
+
 export const loginWithEmail = async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -182,15 +175,67 @@ export const resetPassword = async (req, res) => {
   res.status(200).json({ success: true, message: 'Password reset successful' });
 };
 
-export const logout = (req, res) => {
-  res.clearCookie("token", {
+export const logoutUser = async (req, res) => {
+  res.clearCookie("token");
+  res.status(200).json({ message: "Logged out" });
+};
+
+export const verifyEmail = async (req, res) => {
+  const token = req.params.token;
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await User.findOne({
+    verificationToken: hashedToken,
+    verificationTokenExpire: { $gt: Date.now() },
+  });
+
+  if (!user) return res.status(400).json({ message: "Token is invalid or has expired." });
+
+  user.isVerified = true;
+  user.verificationToken = undefined;
+  user.verificationTokenExpire = undefined;
+  await user.save();
+
+  res.status(200).json({ message: "Email verified successfully" });
+};
+export const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await User.findOne({ email }).select("+password");
+  if (!user || !(await user.comparePassword(password))) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
+
+  if (!user.isVerified) {
+    return res.status(401).json({ message: "Please verify your email first" });
+  }
+
+  const token = generateToken(user._id);
+
+  res.cookie("token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Strict'
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   res.status(200).json({
-    success: true,
-    message: 'Logged out successfully',
+    message: "Login successful",
+    user: { _id: user._id, name: user.name, email: user.email, role: user.role },
   });
+};
+
+
+export const getUser = async (req, res) => {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ message: "Not authenticated" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.status(200).json({ user });
+  } catch (err) {
+    res.status(401).json({ message: "Invalid token" });
+  }
 };

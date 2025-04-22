@@ -23,13 +23,15 @@ connectDB();
 const app = express();
 const corsOptions = {
   origin: [
-    'http://localhost:5173',
-    'https://hairlyf-backend-api.onrender.com',
+    'http://localhost:5173',                      // frontend
+    'https://hairlyf-backend-api.onrender.com',   // production API
+    'http://localhost:5000',                      // Swagger UI (and local backend docs)
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
+
 
 // Middlewares
 app.use(cors(corsOptions));
