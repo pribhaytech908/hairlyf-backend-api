@@ -9,6 +9,7 @@ import {
   getUser,
   logoutUser,
 } from '../controllers/authController.js';
+import { isAuthenticated } from '../middlewares/auth.js';
 
 const router = express.Router();
 
@@ -261,6 +262,6 @@ router.post('/logout', logoutUser);
  *       404:
  *         description: User not found
  */
-router.get("/me", getUser);
+router.get('/me', isAuthenticated, getUser);
 
 export default router;
