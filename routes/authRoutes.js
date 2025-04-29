@@ -1,13 +1,13 @@
 import express from 'express';
 import {
   registerUser,
-  loginWithEmail,
-  sendOTP,
-  verifyOTP,
+  loginUser,
+  sendOtp,
+  verifyEmail,
   forgotPassword,
   resetPassword,
-  getUser,
   logoutUser,
+  getUser,
 } from '../controllers/authController.js';
 import { isAuthenticated } from '../middlewares/auth.js';
 
@@ -54,9 +54,9 @@ router.post('/register', registerUser);
 
 /**
  * @swagger
- * /api/auth/login/email:
+ * /api/auth/login:
  *   post:
- *     summary: Login using email and password
+ *     summary: Login using email/password or phone/OTP
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -65,18 +65,28 @@ router.post('/register', registerUser);
  *           schema:
  *             type: object
  *             required:
- *               - email
- *               - password
+ *               - method
+ *               - email (if method is email_password)
+ *               - password (if method is email_password)
+ *               - phone (if method is phone_otp)
+ *               - otp (if method is phone_otp)
  *             properties:
+ *               method:
+ *                 type: string
+ *                 enum: [email_password, phone_otp]
  *               email:
  *                 type: string
  *               password:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               otp:
  *                 type: string
  *     responses:
  *       200:
  *         description: Login successful
  */
-router.post('/login/email', loginWithEmail);
+router.post('/login', loginUser);
 
 /**
  * @swagger
@@ -99,34 +109,28 @@ router.post('/login/email', loginWithEmail);
  *       200:
  *         description: OTP sent successfully
  */
-router.post('/login/otp/send', sendOTP);
+router.post('/login/otp/send', sendOtp);
 
 /**
  * @swagger
- * /api/auth/login/otp/verify:
- *   post:
- *     summary: Verify OTP and login
+ * /api/auth/verify-email/{token}:
+ *   get:
+ *     summary: Verify user email using verification token
  *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - phone
- *               - otp
- *             properties:
- *               phone:
- *                 type: string
- *               otp:
- *                 type: string
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The verification token sent to the user's email
  *     responses:
  *       200:
- *         description: OTP verified and user logged in
+ *         description: Email verified successfully
+ *       400:
+ *         description: Invalid or expired token
  */
-router.post('/login/otp/verify', verifyOTP);
-
+router.get('/verify-email/:token', verifyEmail);
 
 /**
  * @swagger
@@ -199,33 +203,10 @@ router.put('/reset-password/:token', resetPassword);
  *     responses:
  *       200:
  *         description: Successfully logged out
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: User logged out successfully
  *       401:
  *         description: Unauthorized - User not logged in or token invalid
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Unauthorized
  */
 router.post('/logout', logoutUser);
-
 
 /**
  * @swagger
@@ -237,26 +218,6 @@ router.post('/logout', logoutUser);
  *     responses:
  *       200:
  *         description: Successfully retrieved user details
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 user:
- *                   type: object
- *                   properties:
- *                     _id:
- *                       type: string
- *                       example: "64fa2ed45678e2016c6f7a1c"
- *                     name:
- *                       type: string
- *                       example: John Doe
- *                     email:
- *                       type: string
- *                       example: johndoe@example.com
- *                     role:
- *                       type: string
- *                       example: user
  *       401:
  *         description: Unauthorized - Token missing or invalid
  *       404:
