@@ -88,15 +88,20 @@ export const loginUser = async (req, res) => {
     if (req.cookies.token) {
       return res.status(403).json({ message: "Already logged in. Please logout to login again." });
     }
+
     let user;
+
     if (method === "email_password") {
       const { email, password } = req.body;
       if (!email || !password)
         return res.status(400).json({ message: "Email and password required" });
+
       user = await User.findOne({ email }).select("+password");
       if (!user) return res.status(404).json({ message: "User not found" });
+
       if (!user.isVerified)
         return res.status(403).json({ message: "Please verify your email first" });
+
       const isMatch = await user.comparePassword(password);
       if (!isMatch)
         return res.status(400).json({ message: "Invalid password" });
@@ -105,18 +110,25 @@ export const loginUser = async (req, res) => {
       const { phone, otp } = req.body;
       if (!phone || !otp)
         return res.status(400).json({ message: "Phone and OTP required" });
+
       user = await User.findOne({ phone });
       if (!user) return res.status(404).json({ message: "User not found" });
+
+      if (!user.isVerified)
+        return res.status(403).json({ message: "Please verify your email first" });
+
       const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
       const isOtpValid = user.otp === hashedOtp && user.otpExpire > Date.now();
       if (!isOtpValid)
         return res.status(400).json({ message: "Invalid or expired OTP" });
+
       user.otp = undefined;
       user.otpExpire = undefined;
       await user.save();
     } else {
       return res.status(400).json({ message: "Invalid login method" });
     }
+
     const token = generateToken(user._id);
     res.cookie("token", token, {
       httpOnly: true,
@@ -124,6 +136,7 @@ export const loginUser = async (req, res) => {
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+
     res.status(200).json({ message: "Login successful" });
 
   } catch (err) {
