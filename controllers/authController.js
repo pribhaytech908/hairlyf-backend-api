@@ -20,7 +20,7 @@ export const generateAndSaveOtp = async (user, expireMinutes = 10) => {
   const newOtp = new OTP({
     otp: hashedOtp,
     expireAt: new Date(otpExpire),
-    user: user._id,
+    userId: user._id,
   });
   await newOtp.save();
   return otp;
