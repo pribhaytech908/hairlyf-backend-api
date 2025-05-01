@@ -23,7 +23,7 @@ import {
 const router = express.Router();
 /**
  * @swagger
- * /auth/register:
+ * /api/auth/register:
  *   post:
  *     summary: Register a new user
  *     tags: [Auth]
@@ -55,7 +55,7 @@ router.post("/register", registerUser);
 
 /**
  * @swagger
- * /auth/verify-otp:
+ * /api/auth/verify-otp:
  *   post:
  *     summary: Verify OTP during registration
  *     tags: [Auth]
@@ -76,7 +76,7 @@ router.post("/verify-otp", verifyOtp);
 
 /**
  * @swagger
- * /auth/resend-otp:
+ * /api/auth/resend-otp:
  *   post:
  *     summary: Resend OTP
  *     tags: [Auth]
@@ -103,7 +103,7 @@ router.post("/send-login-otp", sendLoginOtp);
 
 /**
  * @swagger
- * /auth/verify-login-otp:
+ * /api/auth/verify-login-otp:
  *   post:
  *     summary: Verify login OTP
  *     tags: [Auth]
@@ -112,7 +112,7 @@ router.post("/verify-login-otp", verifyLoginOtp);
 
 /**
  * @swagger
- * /auth/login/phone:
+ * /api/auth/login/phone:
  *   post:
  *     summary: Login with phone OTP
  *     tags: [Auth]
@@ -121,7 +121,7 @@ router.post("/login/phone", loginWithPhoneOtp);
 
 /**
  * @swagger
- * /auth/send-otp:
+ * /api/auth/send-otp:
  *   post:
  *     summary: Send OTP to phone
  *     tags: [Auth]
@@ -130,7 +130,7 @@ router.post("/send-otp", sendOtp);
 
 /**
  * @swagger
- * /auth/verify-email/{token}:
+ * /api/auth/verify-email/{token}:
  *   get:
  *     summary: Verify email with token
  *     tags: [Auth]
@@ -146,7 +146,7 @@ router.get("/verify-email/:token", verifyEmail);
 
 /**
  * @swagger
- * /auth/forgot-password:
+ * /api/auth/forgot-password:
  *   post:
  *     summary: Forgot password
  *     tags: [Auth]
@@ -155,7 +155,7 @@ router.post("/forgot-password", forgotPassword);
 
 /**
  * @swagger
- * /auth/logout:
+ * /api/auth/logout:
  *   post:
  *     summary: Logout user
  *     tags: [Auth]
