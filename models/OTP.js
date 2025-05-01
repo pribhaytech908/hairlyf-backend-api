@@ -1,5 +1,3 @@
-import { Schema, model } from "mongoose";
-
 const otpSchema = new Schema({
   userId: {
     type: Schema.Types.ObjectId,
@@ -10,10 +8,9 @@ const otpSchema = new Schema({
     type: String,
     required: true
   },
-  createdAt: {
+  expireAt: {
     type: Date,
-    default: Date.now,
-    expires: 300 // OTP expires in 5 minutes
+    required: true
   }
 });
 

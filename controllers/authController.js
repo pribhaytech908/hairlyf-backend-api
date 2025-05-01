@@ -17,7 +17,7 @@ export const generateAndSaveOtp = async (user, expireMinutes = 10) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
   const otpExpire = Date.now() + expireMinutes * 60 * 1000;
-  const newOtp = new otp({
+  const newOtp = new OTP({
     otp: hashedOtp,
     expireAt: new Date(otpExpire),
     user: user._id,
@@ -25,6 +25,7 @@ export const generateAndSaveOtp = async (user, expireMinutes = 10) => {
   await newOtp.save();
   return otp;
 };
+
 
 // Send OTP to phone
 export const sendOtp = async (req, res) => {
@@ -102,8 +103,8 @@ export const verifyOtp = async (req, res) => {
   const { otp } = req.body;
   try {
     const otpRecord = await OTP.findOne({
-      otp: otp,
-      createdAt: { $gt: Date.now() - 5 * 60 * 1000 },
+      otp: crypto.createHash("sha256").update(otp).digest("hex"),
+      expireAt: { $gt: Date.now() }
     });
 
     if (!otpRecord) {
@@ -128,6 +129,7 @@ export const verifyOtp = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 // Resend OTP
 export const resendOtp = async (req, res) => {
