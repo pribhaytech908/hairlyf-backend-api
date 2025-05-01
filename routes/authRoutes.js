@@ -21,7 +21,6 @@ import {
 } from "../controllers/authController.js";
 
 const router = express.Router();
-
 /**
  * @swagger
  * /auth/register:
