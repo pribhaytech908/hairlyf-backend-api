@@ -39,6 +39,8 @@ const router = express.Router();
  *               - phone
  *               - password
  *             properties:
+ *              name:
+ *                type: string
  *               email:
  *                 type: string
  *               phone:
