@@ -1,3 +1,5 @@
+import { Schema } from "mongoose";
+
 const otpSchema = new Schema({
   userId: {
     type: Schema.Types.ObjectId,
