@@ -34,6 +34,7 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
+ *                -name
  *               - email
  *               - phone
  *               - password
