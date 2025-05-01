@@ -2,7 +2,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { sendEmail } from "../utils/sendEmail.js";
-import { sendSMS } from "../utils/sendSMS.js"; // Make sure this util exists
+import { sendSMS } from "../utils/sendSms.js";
 
 // JWT Token Generator
 const generateToken = (userId) => {
