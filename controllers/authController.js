@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { sendSMS } from "../utils/sendSms.js";
+import OTP from "../models/OTP.js";
 
 // JWT Token Generator
 const generateToken = (userId) => {
@@ -12,12 +13,16 @@ const generateToken = (userId) => {
 };
 
 // Common OTP handler
-const generateAndSaveOtp = async (user, expireMinutes = 10) => {
+export const generateAndSaveOtp = async (user, expireMinutes = 10) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
-  user.otp = hashedOtp;
-  user.otpExpire = Date.now() + expireMinutes * 60 * 1000;
-  await user.save();
+  const otpExpire = Date.now() + expireMinutes * 60 * 1000;
+  const newOtp = new otp({
+    otp: hashedOtp,
+    expireAt: new Date(otpExpire),
+    user: user._id,
+  });
+  await newOtp.save();
   return otp;
 };
 
@@ -96,18 +101,28 @@ export const registerUser = async (req, res) => {
 export const verifyOtp = async (req, res) => {
   const { otp } = req.body;
   try {
-    const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
-    const user = await User.findOne({
-      otp: hashedOtp,
-      otpExpire: { $gt: Date.now() },
+    const otpRecord = await OTP.findOne({
+      otp: otp,
+      createdAt: { $gt: Date.now() - 5 * 60 * 1000 },
     });
-    if (!user)
-      return res.status(400).json({ message: "Invalid or expired OTP" });
 
+    if (!otpRecord) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    // Find the user linked to the OTP
+    const user = await User.findById(otpRecord.userId);
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    // Mark the user as verified
     user.isVerified = true;
-    user.otp = undefined;
-    user.otpExpire = undefined;
     await user.save();
+
+    // Optionally, delete the OTP after successful verification (prevents reuse)
+    await OTP.deleteOne({ _id: otpRecord._id });
+
     res.status(200).json({ message: "Email verified successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });

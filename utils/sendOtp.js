@@ -1,17 +1,24 @@
-import { sendSMS } from "./sendSms.js";
+import nodemailer from "nodemailer";
 
-export const sendOtp = async (req, res) => {
-  const { phone } = req.body;
+export const sendOtpToUser = async (email, otp) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Your OTP Code",
+    text: `Your OTP is: ${otp}`,
+  };
+
   try {
-    const user = await User.findOne({ phone });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const otp = await generateAndSaveOtp(user, 5);
-
-    console.log("OTP:", otp); // Remove in production
-    await sendSMS(phone, `Your OTP is: ${otp}`);
-    res.status(200).json({ message: "OTP sent to phone number" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Error sending OTP email:", error);
   }
 };
