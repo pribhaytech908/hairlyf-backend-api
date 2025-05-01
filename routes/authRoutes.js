@@ -34,13 +34,13 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *                -name
+ *               - name
  *               - email
  *               - phone
  *               - password
  *             properties:
- *              name:
- *                type: string
+ *               name:
+ *                 type: string
  *               email:
  *                 type: string
  *               phone:
