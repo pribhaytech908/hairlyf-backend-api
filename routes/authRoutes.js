@@ -170,12 +170,18 @@ router.post("/logout", logoutUser);
 
 /**
  * @swagger
+ * tags:
+ *   name: Phone Authentication
+ *   description: OTP based login and signup
+ */
+
+/**
+ * @swagger
  * /api/auth/phone-auth/request:
  *   post:
- *     summary: Request OTP for login/signup
- *     tags: [Phone Auth]
+ *     summary: Send OTP to user's phone number
+ *     tags: [Phone Authentication]
  *     requestBody:
- *       description: Phone number to send OTP
  *       required: true
  *       content:
  *         application/json:
@@ -193,16 +199,15 @@ router.post("/logout", logoutUser);
  *       400:
  *         description: Phone is required
  */
-router.post("/request", sendOtpToPhone);
+router.post("/phone-auth/request", sendOtpToPhone);
 
 /**
  * @swagger
  * /api/auth/phone-auth/verify:
  *   post:
- *     summary: Verify OTP and complete login/signup
- *     tags: [Phone Auth]
+ *     summary: Verify OTP and log in or register user
+ *     tags: [Phone Authentication]
  *     requestBody:
- *       description: Phone number and OTP
  *       required: true
  *       content:
  *         application/json:
@@ -224,7 +229,8 @@ router.post("/request", sendOtpToPhone);
  *       400:
  *         description: Invalid or expired OTP
  */
-router.post("/verify", verifyPhoneOtp);
+router.post("/phone-auth/verify", verifyPhoneOtp);
+
 
 
 
