@@ -18,6 +18,8 @@ import {
   verifyEmail,
   forgotPassword,
   logoutUser,
+  sendOtpToPhone,
+  verifyPhoneOtp,
 } from "../controllers/authController.js";
 
 const router = express.Router();
@@ -161,5 +163,70 @@ router.post("/forgot-password", forgotPassword);
  *     tags: [Auth]
  */
 router.post("/logout", logoutUser);
+
+
+
+// Swagger documentation for the routes lorem30
+
+/**
+ * @swagger
+ * /api/phone-auth/request:
+ *   post:
+ *     summary: Request OTP for login/signup
+ *     tags: [Phone Auth]
+ *     requestBody:
+ *       description: Phone number to send OTP
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - phone
+ *             properties:
+ *               phone:
+ *                 type: string
+ *                 example: "9876543210"
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *       400:
+ *         description: Phone is required
+ */
+router.post("/request", sendOtpToPhone);
+
+/**
+ * @swagger
+ * /api/phone-auth/verify:
+ *   post:
+ *     summary: Verify OTP and complete login/signup
+ *     tags: [Phone Auth]
+ *     requestBody:
+ *       description: Phone number and OTP
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - phone
+ *               - otp
+ *             properties:
+ *               phone:
+ *                 type: string
+ *                 example: "9876543210"
+ *               otp:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       400:
+ *         description: Invalid or expired OTP
+ */
+router.post("/verify", verifyPhoneOtp);
+
+
+
 
 export default router;

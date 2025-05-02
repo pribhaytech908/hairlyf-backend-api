@@ -4,7 +4,8 @@ import User from "../models/User.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { sendSMS } from "../utils/sendSms.js";
 import OTP from "../models/OTP.js";
-
+import OTPOTP from "../models/OtpOtp.js";
+import OTPUSER from "../models/OtpUser.js";
 // JWT Token Generator
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -329,4 +330,69 @@ export const getUserProfile = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+};
+
+
+
+
+
+
+// Update User Profile (new register login  functionality)
+export const sendOtpToPhone = async (req, res) => {
+  const { phone } = req.body;
+
+  if (!phone) return res.status(400).json({ message: "Phone is required" });
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+  const expireAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+  // Remove old OTPs for this phone
+  await OTPOTP.deleteMany({ phone });
+
+  // Save new OTP
+  const newOtp = new OTPOTP({ phone, otp: hashedOtp, expireAt });
+  await newOtp.save();
+
+  console.log(`OTP for ${phone}: ${otp}`); // Remove this in production
+  await sendSMS(phone, `Your OTP is: ${otp}`);
+
+  res.status(200).json({ message: "OTP sent to phone number" });
+};
+
+// ✅ Verify OTP and Login/Register
+export const verifyPhoneOtp = async (req, res) => {
+  const { phone, otp } = req.body;
+
+  if (!phone || !otp)
+    return res.status(400).json({ message: "Phone and OTP required" });
+
+  const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+
+  const otpRecord = await OTPOTP.findOne({
+    phone,
+    otp: hashedOtp,
+    expireAt: { $gt: Date.now() },
+  });
+
+  if (!otpRecord)
+    return res.status(400).json({ message: "Invalid or expired OTP" });
+
+  let user = await OTPUSER.findOne({ phone });
+  if (!user) {
+    user = await OTPUSER.create({ phone });
+  }
+
+  await OTPOTP.deleteMany({ phone }); // Clean up OTPs
+
+  const token = generateToken(user._id);
+
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+
+  res.status(200).json({ message: "Login successful", user });
 };
