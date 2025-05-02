@@ -170,7 +170,7 @@ router.post("/logout", logoutUser);
 
 /**
  * @swagger
- * /api/phone-auth/request:
+ * /api/auth/phone-auth/request:
  *   post:
  *     summary: Request OTP for login/signup
  *     tags: [Phone Auth]
@@ -197,7 +197,7 @@ router.post("/request", sendOtpToPhone);
 
 /**
  * @swagger
- * /api/phone-auth/verify:
+ * /api/auth/phone-auth/verify:
  *   post:
  *     summary: Verify OTP and complete login/signup
  *     tags: [Phone Auth]
