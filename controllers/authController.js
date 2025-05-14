@@ -626,13 +626,12 @@ export const deleteAccount = catchAsync(async (req, res) => {
 
 // Verify OTP for account verification
 export const verifyOtp = catchAsync(async (req, res) => {
-  const { otp } = req.body;
-  const { email } = req.query;
+  const { otp, email } = req.body;
 
-  if (!otp) {
+  if (!otp || !email) {
     return res.status(400).json({
       success: false,
-      message: "OTP is required"
+      message: "OTP and email are required"
     });
   }
 

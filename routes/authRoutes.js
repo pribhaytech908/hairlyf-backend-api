@@ -111,8 +111,13 @@ router.post("/register", rateLimiter(5, 60 * 60), registerUser);
  *           schema:
  *             type: object
  *             required:
+ *               - email
  *               - otp
  *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john@example.com"
  *               otp:
  *                 type: string
  *                 example: "123456"
@@ -121,6 +126,8 @@ router.post("/register", rateLimiter(5, 60 * 60), registerUser);
  *         description: OTP verified successfully
  *       400:
  *         description: Invalid or expired OTP
+ *       404:
+ *         description: User not found
  *       429:
  *         description: Too many attempts
  */
