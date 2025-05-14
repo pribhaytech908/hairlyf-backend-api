@@ -6,6 +6,7 @@ import { sendSMS } from "../utils/sendSms.js";
 import OTP from "../models/OTP.js";
 import OTPOTP from "../models/OtpOtp.js";
 import OTPUSER from "../models/OtpUser.js";
+import Session from "../models/Session.js";
 
 // Constants
 const TOKEN_EXPIRY = {
@@ -264,6 +265,17 @@ export const loginWithEmail = catchAsync(async (req, res) => {
   // Generate tokens
   const { accessToken, refreshToken } = generateTokens(user._id);
 
+  // Create session with device info
+  const deviceInfo = {
+    userAgent: req.headers['user-agent'],
+    browser: req.headers['sec-ch-ua'],
+    os: req.headers['sec-ch-ua-platform'],
+    device: req.headers['sec-ch-ua-mobile'] ? 'mobile' : 'desktop',
+    ip: req.ip
+  };
+  
+  const sessionId = await createSession(user._id, deviceInfo);
+
   // Update last login
   user.lastLogin = new Date();
   await user.save();
@@ -277,6 +289,12 @@ export const loginWithEmail = catchAsync(async (req, res) => {
   res.cookie("refreshToken", refreshToken, {
     ...COOKIE_OPTIONS,
     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+
+  // Set session cookie
+  res.cookie("sessionId", sessionId.toString(), {
+    ...COOKIE_OPTIONS,
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
   });
 
   // Prepare user data without sensitive information
@@ -298,7 +316,8 @@ export const loginWithEmail = catchAsync(async (req, res) => {
       tokens: {
         accessToken,
         refreshToken
-      }
+      },
+      sessionId
     }
   });
 });
@@ -602,6 +621,319 @@ export const deleteAccount = catchAsync(async (req, res) => {
   res.status(200).json({
     success: true,
     message: "Account deleted successfully"
+  });
+});
+
+// Verify OTP for account verification
+export const verifyOtp = catchAsync(async (req, res) => {
+  const { otp } = req.body;
+  const { email } = req.query;
+
+  if (!otp) {
+    return res.status(400).json({
+      success: false,
+      message: "OTP is required"
+    });
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found"
+    });
+  }
+
+  const otpRecord = await OTP.findOne({ userId: user._id });
+  if (!otpRecord) {
+    return res.status(400).json({
+      success: false,
+      message: "OTP expired or not found"
+    });
+  }
+
+  // Check if OTP is expired
+  if (otpRecord.expireAt < Date.now()) {
+    await OTP.deleteOne({ _id: otpRecord._id });
+    return res.status(400).json({
+      success: false,
+      message: "OTP has expired"
+    });
+  }
+
+  // Verify OTP
+  const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+  if (hashedOtp !== otpRecord.otp) {
+    otpRecord.attempts += 1;
+    if (otpRecord.attempts >= 5) {
+      await OTP.deleteOne({ _id: otpRecord._id });
+      return res.status(429).json({
+        success: false,
+        message: "Too many failed attempts. Please request a new OTP."
+      });
+    }
+    await otpRecord.save();
+    return res.status(400).json({
+      success: false,
+      message: "Invalid OTP"
+    });
+  }
+
+  // Mark user as verified
+  user.isVerified = true;
+  await user.save();
+  await OTP.deleteOne({ _id: otpRecord._id });
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Account verified successfully"
+  });
+});
+
+// Resend verification OTP
+export const resendOtp = catchAsync(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: "Email is required"
+    });
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found"
+    });
+  }
+
+  if (user.isVerified) {
+    return res.status(400).json({
+      success: false,
+      message: "User is already verified"
+    });
+  }
+
+  const otp = await generateAndSaveOtp(user, 10);
+
+  const message = `
+    <h2>Account Verification</h2>
+    <p>Hello ${user.name},</p>
+    <p>Your new verification OTP is:</p>
+    <p style="font-size: 24px; font-weight: bold; color: #4CAF50;">${otp}</p>
+    <p>This OTP will expire in 10 minutes.</p>
+    <p>If you didn't request this OTP, please ignore this email.</p>
+  `;
+
+  await sendEmail(user.email, "Account Verification - New OTP", message);
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "New OTP sent successfully"
+  });
+});
+
+// Verify email with token
+export const verifyEmail = catchAsync(async (req, res) => {
+  const { token } = req.params;
+
+  if (!token) {
+    return res.status(400).json({
+      success: false,
+      message: "Verification token is required"
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_EMAIL_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is already verified"
+      });
+    }
+
+    user.isVerified = true;
+    await user.save();
+
+    setSecurityHeaders(res);
+    res.status(200).json({
+      success: true,
+      message: "Email verified successfully"
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired verification token"
+    });
+  }
+});
+
+// Verify phone OTP
+export const verifyPhoneOtp = catchAsync(async (req, res) => {
+  const { phone, otp } = req.body;
+
+  if (!phone || !otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Phone number and OTP are required"
+    });
+  }
+
+  const user = await User.findOne({ phone });
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found"
+    });
+  }
+
+  const otpRecord = await OTPOTP.findOne({ phone });
+  if (!otpRecord) {
+    return res.status(400).json({
+      success: false,
+      message: "OTP expired or not found"
+    });
+  }
+
+  // Check if OTP is expired
+  if (otpRecord.expireAt < Date.now()) {
+    await OTPOTP.deleteOne({ _id: otpRecord._id });
+    return res.status(400).json({
+      success: false,
+      message: "OTP has expired"
+    });
+  }
+
+  // Verify OTP
+  const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+  if (hashedOtp !== otpRecord.otp) {
+    otpRecord.attempts += 1;
+    if (otpRecord.attempts >= 5) {
+      await OTPOTP.deleteOne({ _id: otpRecord._id });
+      return res.status(429).json({
+        success: false,
+        message: "Too many failed attempts. Please request a new OTP."
+      });
+    }
+    await otpRecord.save();
+    return res.status(400).json({
+      success: false,
+      message: "Invalid OTP"
+    });
+  }
+
+  // Mark phone as verified
+  user.isPhoneVerified = true;
+  await user.save();
+  await OTPOTP.deleteOne({ _id: otpRecord._id });
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Phone number verified successfully"
+  });
+});
+
+// Track user session
+const createSession = async (userId, deviceInfo) => {
+  const session = new Session({
+    user: userId,
+    deviceInfo,
+    lastActive: new Date(),
+    isActive: true
+  });
+  await session.save();
+  return session._id;
+};
+
+// Get all active sessions
+export const getActiveSessions = catchAsync(async (req, res) => {
+  const sessions = await Session.find({
+    user: req.user.id,
+    isActive: true
+  }).select('deviceInfo lastActive createdAt');
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    data: { sessions }
+  });
+});
+
+// Logout from specific session
+export const logoutFromSession = catchAsync(async (req, res) => {
+  const { sessionId } = req.params;
+
+  const session = await Session.findOne({
+    _id: sessionId,
+    user: req.user.id
+  });
+
+  if (!session) {
+    return res.status(404).json({
+      success: false,
+      message: "Session not found"
+    });
+  }
+
+  session.isActive = false;
+  await session.save();
+
+  // If current session, clear cookies
+  if (session._id.toString() === req.session?._id.toString()) {
+    res.clearCookie("token");
+    res.clearCookie("refreshToken");
+  }
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Logged out from session successfully"
+  });
+});
+
+// Logout from all devices
+export const logoutFromAllDevices = catchAsync(async (req, res) => {
+  await Session.updateMany(
+    { user: req.user.id, isActive: true },
+    { isActive: false }
+  );
+
+  res.clearCookie("token");
+  res.clearCookie("refreshToken");
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Logged out from all devices successfully"
+  });
+});
+
+// Update last active timestamp
+export const updateLastActive = catchAsync(async (req, res) => {
+  if (req.session) {
+    req.session.lastActive = new Date();
+    await req.session.save();
+  }
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Last active timestamp updated"
   });
 });
 

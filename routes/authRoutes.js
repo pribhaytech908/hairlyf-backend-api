@@ -36,14 +36,10 @@ import {
   verifyOtp,
   resendOtp,
   loginWithEmail,
-  loginWithPhoneOtp,
-  sendOtp,
-  sendLoginOtp,
-  verifyLoginOtp,
   verifyEmail,
   forgotPassword,
   logoutUser,
-  sendOtpToPhone,
+  sendOtp,
   verifyPhoneOtp,
   resetPassword,
   refreshToken,
@@ -51,10 +47,13 @@ import {
   updateProfile,
   changePassword,
   deleteAccount,
+  getActiveSessions,
+  logoutFromSession,
+  logoutFromAllDevices,
+  updateLastActive,
 } from "../controllers/authController.js";
-import { protect } from '../middleware/authMiddleware.js';
-import { rateLimiter } from '../middleware/rateLimiter.js';
-
+import { protect } from '../middlewares/auth.js';
+import { rateLimiter } from '../middlewares/rateLimiter.js';
 const router = express.Router();
 
 /**
@@ -320,7 +319,7 @@ router.post("/verify-email/:token", verifyEmail);
  *       429:
  *         description: Too many requests
  */
-router.post("/phone-auth/request", rateLimiter(5, 60 * 60), sendOtpToPhone);
+router.post("/phone-auth/request", rateLimiter(5, 60 * 60), sendOtp);
 
 /**
  * @swagger
@@ -486,5 +485,112 @@ router.delete('/delete-account', deleteAccount);
  *         description: Not authenticated
  */
 router.post("/logout", logoutUser);
+
+/**
+ * @swagger
+ * /api/auth/sessions:
+ *   get:
+ *     summary: Get all active sessions for the current user
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of active sessions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     sessions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           deviceInfo:
+ *                             type: object
+ *                             properties:
+ *                               userAgent:
+ *                                 type: string
+ *                               browser:
+ *                                 type: string
+ *                               os:
+ *                                 type: string
+ *                               device:
+ *                                 type: string
+ *                               ip:
+ *                                 type: string
+ *                           lastActive:
+ *                             type: string
+ *                             format: date-time
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *       401:
+ *         description: Not authenticated
+ */
+router.get('/sessions', getActiveSessions);
+
+/**
+ * @swagger
+ * /api/auth/sessions/{sessionId}:
+ *   delete:
+ *     summary: Logout from a specific session
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Session ID to logout from
+ *     responses:
+ *       200:
+ *         description: Successfully logged out from session
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Session not found
+ */
+router.delete('/sessions/:sessionId', logoutFromSession);
+
+/**
+ * @swagger
+ * /api/auth/sessions:
+ *   delete:
+ *     summary: Logout from all sessions
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully logged out from all sessions
+ *       401:
+ *         description: Not authenticated
+ */
+router.delete('/sessions', logoutFromAllDevices);
+
+/**
+ * @swagger
+ * /api/auth/sessions/heartbeat:
+ *   post:
+ *     summary: Update last active timestamp for current session
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Last active timestamp updated successfully
+ *       401:
+ *         description: Not authenticated
+ */
+router.post('/sessions/heartbeat', updateLastActive);
 
 export default router;
