@@ -53,7 +53,7 @@ import {
   updateLastActive,
 } from "../controllers/authController.js";
 import { protect } from '../middlewares/auth.js';
-import { rateLimiter } from '../middlewares/rateLimiter.js';
+import { rateLimiter } from '../utils/rateLimiter.js';
 const router = express.Router();
 
 /**
