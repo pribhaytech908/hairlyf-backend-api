@@ -6,393 +6,602 @@ import { sendSMS } from "../utils/sendSms.js";
 import OTP from "../models/OTP.js";
 import OTPOTP from "../models/OtpOtp.js";
 import OTPUSER from "../models/OtpUser.js";
-// JWT Token Generator
-const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: "7d",
-  });
+
+// Constants
+const TOKEN_EXPIRY = {
+  ACCESS: '1d',
+  REFRESH: '7d',
+  RESET_PASSWORD: '10m',
+  EMAIL_VERIFY: '1h'
 };
 
-// Common OTP handler
-export const generateAndSaveOtp = async (user, expireMinutes = 10) => {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
-  const otpExpire = Date.now() + expireMinutes * 60 * 1000;
-  const newOtp = new OTP({
-    otp: hashedOtp,
-    expireAt: new Date(otpExpire),
-    userId: user._id,
-  });
-  await newOtp.save();
-  return otp;
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict"
 };
 
+// Error Handler
+const catchAsync = (fn) => {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
 
-// Send OTP to phone
-export const sendOtp = async (req, res) => {
-  const { phone } = req.body;
+// JWT Token Generator with different types
+const generateTokens = (userId, type = 'auth') => {
   try {
-    const user = await User.findOne({ phone });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const otp = await generateAndSaveOtp(user, 5);
-
-    console.log("OTP:", otp); // Remove in production
-    await sendSMS(phone, `Your OTP is: ${otp}`);
-    res.status(200).json({ message: "OTP sent to phone number" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// Email verification via token
-export const verifyEmail = async (req, res) => {
-  const token = req.params.token;
-  try {
-    const decoded = jwt.verify(token, process.env.EMAIL_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (user.isVerified)
-      return res.status(400).json({ message: "Email already verified" });
-
-    user.isVerified = true;
-    await user.save();
-    res.status(200).json({ message: "Email verified successfully" });
+    let tokens = {};
+    
+    switch(type) {
+      case 'auth':
+        tokens.accessToken = jwt.sign(
+          { id: userId }, 
+          process.env.JWT_SECRET, 
+          { expiresIn: TOKEN_EXPIRY.ACCESS }
+        );
+        tokens.refreshToken = jwt.sign(
+          { id: userId }, 
+          process.env.JWT_REFRESH_SECRET, 
+          { expiresIn: TOKEN_EXPIRY.REFRESH }
+        );
+        break;
+      
+      case 'resetPassword':
+        tokens.resetToken = jwt.sign(
+          { id: userId }, 
+          process.env.JWT_RESET_SECRET, 
+          { expiresIn: TOKEN_EXPIRY.RESET_PASSWORD }
+        );
+        break;
+      
+      case 'emailVerify':
+        tokens.emailToken = jwt.sign(
+          { id: userId }, 
+          process.env.JWT_EMAIL_SECRET, 
+          { expiresIn: TOKEN_EXPIRY.EMAIL_VERIFY }
+        );
+        break;
+    }
+    
+    return tokens;
   } catch (error) {
-    res.status(400).json({ message: "Invalid or expired token" });
+    throw new Error('Token generation failed');
   }
 };
 
-// User Registration
-export const registerUser = async (req, res) => {
-  const { name, email, phone, password } = req.body;
-  try {
-    const existingUser = await User.findOne({ email });
-    if (existingUser)
-      return res.status(400).json({ message: "User already exists" });
-
-    const user = await User.create({
-      name,
-      email,
-      phone,
-      password,
-      isVerified: false,
-    });
-
-    const otp = await generateAndSaveOtp(user, 10);
-
-    const message = `
-      <h2>Hello ${user.name},</h2>
-      <p>Please verify your account by entering the OTP below:</p>
-      <p><strong>OTP: ${otp}</strong></p>
-      <p>Expires in 10 minutes.</p>
-    `;
-
-    await sendEmail(user.email, "Account Verification OTP", message);
-    res.status(201).json({
-      message:
-        "Registration successful. Check your email for the OTP to verify your account.",
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+// Set Security Headers
+const setSecurityHeaders = (res) => {
+  res.set({
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'self'",
+    'X-XSS-Protection': '1; mode=block'
+  });
 };
 
-// OTP Verification
-export const verifyOtp = async (req, res) => {
-  const { otp } = req.body;
+// Common OTP handler with improved security
+export const generateAndSaveOtp = async (user, expireMinutes = 10) => {
   try {
-    const otpRecord = await OTP.findOne({
-      otp: crypto.createHash("sha256").update(otp).digest("hex"),
-      expireAt: { $gt: Date.now() }
-    });
-
-    if (!otpRecord) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-    }
-
-    // Find the user linked to the OTP
-    const user = await User.findById(otpRecord.userId);
-    if (!user) {
-      return res.status(400).json({ message: "User not found" });
-    }
-
-    // Mark the user as verified
-    user.isVerified = true;
-    await user.save();
-
-    // Optionally, delete the OTP after successful verification (prevents reuse)
-    await OTP.deleteOne({ _id: otpRecord._id });
-
-    res.status(200).json({ message: "Email verified successfully" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-
-// Resend OTP
-export const resendOtp = async (req, res) => {
-  const { email } = req.body;
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (user.isVerified)
-      return res.status(400).json({ message: "User already verified" });
-
-    const otp = await generateAndSaveOtp(user, 10);
-
-    const message = `
-      <h2>Hello ${user.name},</h2>
-      <p>Your new OTP is:</p>
-      <p><strong>${otp}</strong></p>
-      <p>Expires in 10 minutes.</p>
-    `;
-    await sendEmail(user.email, "New OTP for Account Verification", message);
-    res.status(200).json({ message: "OTP resent to email." });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// Email/Password Login
-export const loginWithEmail = async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    if (req.cookies.token)
-      return res.status(403).json({ message: "Already logged in." });
-
-    if (!email || !password)
-      return res.status(400).json({ message: "Email and password required" });
-
-    const user = await User.findOne({ email }).select("+password");
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (!user.isVerified)
-      return res.status(403).json({ message: "Verify your email first" });
-
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid password" });
-
-    const token = generateToken(user._id);
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-    res.status(200).json({ message: "Login successful" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// Phone OTP Login
-export const loginWithPhoneOtp = async (req, res) => {
-  const { phone, otp } = req.body;
-  try {
-    if (req.cookies.token)
-      return res.status(403).json({ message: "Already logged in." });
-
-    if (!phone || !otp)
-      return res.status(400).json({ message: "Phone and OTP required" });
-
-    const user = await User.findOne({ phone });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (!user.isVerified)
-      return res.status(403).json({ message: "Verify your email first" });
-
+    // Generate cryptographically secure OTP
+    const otpBuffer = crypto.randomBytes(3);
+    const otp = parseInt(otpBuffer.toString('hex'), 16).toString().substr(0, 6).padStart(6, '0');
+    
     const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
-    const isValidOtp = user.otp === hashedOtp && user.otpExpire > Date.now();
-
-    if (!isValidOtp)
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-
-    user.otp = undefined;
-    user.otpExpire = undefined;
-    await user.save();
-
-    const token = generateToken(user._id);
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+    const otpExpire = Date.now() + expireMinutes * 60 * 1000;
+    
+    // Delete any existing OTPs for this user
+    await OTP.deleteMany({ userId: user._id });
+    
+    const newOtp = new OTP({
+      otp: hashedOtp,
+      expireAt: new Date(otpExpire),
+      userId: user._id,
+      attempts: 0
     });
-
-    res.status(200).json({ message: "Login successful" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    
+    await newOtp.save();
+    return otp;
+  } catch (error) {
+    throw new Error('OTP generation failed');
   }
 };
 
-// Send Login OTP
-export const sendLoginOtp = async (req, res) => {
+// Send OTP to phone with rate limiting
+export const sendOtp = catchAsync(async (req, res) => {
   const { phone } = req.body;
-  try {
-    if (!phone) return res.status(400).json({ message: "Phone is required" });
-
-    const user = await User.findOne({ phone });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const otp = await generateAndSaveOtp(user, 5);
-    await sendSMS(phone, `Your login OTP is: ${otp}`);
-
-    res.status(200).json({ message: "OTP sent to phone" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// Verify Login OTP
-export const verifyLoginOtp = async (req, res) => {
-  const { phone, otp } = req.body;
-  try {
-    if (!phone || !otp)
-      return res.status(400).json({ message: "Phone and OTP required" });
-
-    const user = await User.findOne({ phone });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
-    const isOtpValid = user.otp === hashedOtp && user.otpExpire > Date.now();
-
-    if (!isOtpValid)
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-
-    user.otp = undefined;
-    user.otpExpire = undefined;
-    await user.save();
-
-    const token = generateToken(user._id);
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+  
+  if (!phone) {
+    return res.status(400).json({
+      success: false,
+      message: "Phone number is required"
     });
-
-    res.status(200).json({ message: "Login successful", user });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
   }
-};
 
-// Forgot Password (continued)
-export const forgotPassword = async (req, res) => {
-  const { email } = req.body;
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const resetToken = user.getResetPasswordToken();
-    await user.save();
-
-    const resetURL = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
-    const message = `
-      <h2>Hello ${user.name},</h2>
-      <p>You requested to reset your password.</p>
-      <p>Click the link below to reset it:</p>
-      <a href="${resetURL}">Reset Password</a>
-      <p>This link will expire in 10 minutes.</p>
-    `;
-
-    await sendEmail(user.email, "Password Reset Request", message);
-    res.status(200).json({ message: "Password reset link sent to email." });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-// Logout User
-export const logoutUser = async (req, res) => {
-  try {
-    // Clear the token cookie
-    res.cookie("token", "", { maxAge: 0, httpOnly: true, sameSite: "strict" });
-    res.status(200).json({ message: "Logged out successfully" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// Get User Profile
-export const getUserProfile = async (req, res) => {
-  try {
-    const userId = req.user.id; // Assuming the user is added to the request after JWT verification
-    const user = await User.findById(userId).select("-password"); // Exclude password from the profile
-
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    res.status(200).json({ user });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-
-
-
-
-
-// Update User Profile (new register login  functionality)
-export const sendOtpToPhone = async (req, res) => {
-  const { phone } = req.body;
-
-  if (!phone) return res.status(400).json({ message: "Phone is required" });
-
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
-  const expireAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-  // Remove old OTPs for this phone
-  await OTPOTP.deleteMany({ phone });
-
-  // Save new OTP
-  const newOtp = new OTPOTP({ phone, otp: hashedOtp, expireAt });
-  await newOtp.save();
-
-  console.log(`OTP for ${phone}: ${otp}`); // Remove this in production
-  await sendSMS(phone, `Your OTP is: ${otp}`);
-
-  res.status(200).json({ message: "OTP sent to phone number" });
-};
-
-// ✅ Verify OTP and Login/Register
-export const verifyPhoneOtp = async (req, res) => {
-  const { phone, otp } = req.body;
-
-  if (!phone || !otp)
-    return res.status(400).json({ message: "Phone and OTP required" });
-
-  const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
-
-  const otpRecord = await OTPOTP.findOne({
+  // Check rate limiting
+  const recentAttempts = await OTPOTP.countDocuments({
     phone,
-    otp: hashedOtp,
-    expireAt: { $gt: Date.now() },
+    createdAt: { $gt: new Date(Date.now() - 60 * 60 * 1000) } // Last hour
   });
 
-  if (!otpRecord)
-    return res.status(400).json({ message: "Invalid or expired OTP" });
-
-  let user = await OTPUSER.findOne({ phone });
-  if (!user) {
-    user = await OTPUSER.create({ phone });
+  if (recentAttempts >= 5) {
+    return res.status(429).json({
+      success: false,
+      message: "Too many OTP requests. Please try again after an hour."
+    });
   }
 
-  await OTPOTP.deleteMany({ phone }); // Clean up OTPs
+  const user = await User.findOne({ phone });
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found"
+    });
+  }
 
-  const token = generateToken(user._id);
+  const otp = await generateAndSaveOtp(user, 5);
 
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  if (process.env.NODE_ENV === 'development') {
+    console.log("OTP:", otp);
+  }
+
+  await sendSMS(phone, `Your OTP is: ${otp}`);
+  
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "OTP sent successfully"
+  });
+});
+
+// Register User with enhanced security
+export const registerUser = catchAsync(async (req, res) => {
+  const { name, email, phone, password } = req.body;
+
+  // Input validation
+  if (!name || !email || !phone || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "All fields are required"
+    });
+  }
+
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid email format"
+    });
+  }
+
+  // Password strength validation
+  if (password.length < 8) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 8 characters long"
+    });
+  }
+
+  // Check existing user
+  const existingUser = await User.findOne({
+    $or: [{ email }, { phone }]
   });
 
-  res.status(200).json({ message: "Login successful", user });
-};
+  if (existingUser) {
+    return res.status(400).json({
+      success: false,
+      message: existingUser.email === email ? "Email already registered" : "Phone number already registered"
+    });
+  }
+
+  // Create user with limited fields
+  const user = await User.create({
+    name,
+    email,
+    phone,
+    password,
+    isVerified: false
+  });
+
+  // Generate verification OTP
+  const otp = await generateAndSaveOtp(user, 10);
+
+  const message = `
+    <h2>Welcome to Our Platform, ${user.name}!</h2>
+    <p>Thank you for registering. Please verify your account using the OTP below:</p>
+    <p style="font-size: 24px; font-weight: bold; color: #4CAF50;">${otp}</p>
+    <p>This OTP will expire in 10 minutes.</p>
+    <p>If you didn't request this registration, please ignore this email.</p>
+  `;
+
+  await sendEmail(user.email, "Welcome - Account Verification", message);
+
+  setSecurityHeaders(res);
+  res.status(201).json({
+    success: true,
+    message: "Registration successful. Please check your email for verification OTP."
+  });
+});
+
+// Login with email/password
+export const loginWithEmail = catchAsync(async (req, res) => {
+  const { email, password } = req.body;
+
+  // Check for existing session
+  if (req.cookies.token) {
+    return res.status(403).json({
+      success: false,
+      message: "Already logged in"
+    });
+  }
+
+  // Input validation
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and password are required"
+    });
+  }
+
+  // Find user and check password
+  const user = await User.findOne({ email }).select("+password");
+  if (!user || !(await user.comparePassword(password))) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid credentials"
+    });
+  }
+
+  if (!user.isVerified) {
+    return res.status(403).json({
+      success: false,
+      message: "Please verify your email first"
+    });
+  }
+
+  // Generate tokens
+  const { accessToken, refreshToken } = generateTokens(user._id);
+
+  // Update last login
+  user.lastLogin = new Date();
+  await user.save();
+
+  // Set cookies
+  res.cookie("token", accessToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: 24 * 60 * 60 * 1000 // 1 day
+  });
+
+  res.cookie("refreshToken", refreshToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+
+  // Prepare user data without sensitive information
+  const userData = {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    isVerified: user.isVerified,
+    lastLogin: user.lastLogin
+  };
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Login successful",
+    data: {
+      user: userData,
+      tokens: {
+        accessToken,
+        refreshToken
+      }
+    }
+  });
+});
+
+// Refresh token with enhanced security
+export const refreshToken = catchAsync(async (req, res) => {
+  const { refreshToken } = req.cookies;
+
+  if (!refreshToken) {
+    return res.status(401).json({
+      success: false,
+      message: "Refresh token not found"
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const tokens = generateTokens(user._id);
+
+    res.cookie("token", tokens.accessToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 24 * 60 * 60 * 1000
+    });
+
+    res.cookie("refreshToken", tokens.refreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    setSecurityHeaders(res);
+    res.status(200).json({
+      success: true,
+      message: "Tokens refreshed successfully",
+      data: { tokens }
+    });
+  } catch (error) {
+    res.clearCookie("token");
+    res.clearCookie("refreshToken");
+    
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired refresh token"
+    });
+  }
+});
+
+// Logout with session cleanup
+export const logoutUser = catchAsync(async (req, res) => {
+  // Clear all cookies
+  res.clearCookie("token");
+  res.clearCookie("refreshToken");
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Logged out successfully"
+  });
+});
+
+// Forgot password with rate limiting
+export const forgotPassword = catchAsync(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: "Email is required"
+    });
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found"
+    });
+  }
+
+  // Check rate limiting
+  const lastReset = user.passwordResetAttempts || 0;
+  if (Date.now() - lastReset < 15 * 60 * 1000) { // 15 minutes
+    return res.status(429).json({
+      success: false,
+      message: "Please wait 15 minutes before requesting another reset"
+    });
+  }
+
+  const { resetToken } = generateTokens(user._id, 'resetPassword');
+  
+  user.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+    
+  user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  user.passwordResetAttempts = Date.now();
+  
+  await user.save();
+
+  const resetURL = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+  const message = `
+    <h2>Password Reset Request</h2>
+    <p>Hello ${user.name},</p>
+    <p>You requested to reset your password. Click the button below to reset it:</p>
+    <a href="${resetURL}" style="display: inline-block; background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+    <p>If you didn't request this, please ignore this email. This link will expire in 10 minutes.</p>
+    <p>For security reasons, please don't share this link with anyone.</p>
+  `;
+
+  try {
+    await sendEmail(user.email, "Password Reset Request", message);
+    
+    setSecurityHeaders(res);
+    res.status(200).json({
+      success: true,
+      message: "Password reset link sent to email"
+    });
+  } catch (error) {
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    return res.status(500).json({
+      success: false,
+      message: "Error sending email. Please try again later."
+    });
+  }
+});
+
+// Reset password with token verification
+export const resetPassword = catchAsync(async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Token and new password are required"
+    });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 8 characters long"
+    });
+  }
+
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired reset token"
+    });
+  }
+
+  user.password = password;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  await user.save();
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Password reset successful. Please login with your new password."
+  });
+});
+
+// Get user profile with session validation
+export const getUserProfile = catchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id).select('-password');
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found"
+    });
+  }
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    data: { user }
+  });
+});
+
+// Update user profile with validation
+export const updateProfile = catchAsync(async (req, res) => {
+  const allowedUpdates = ['name', 'phone'];
+  const updates = Object.keys(req.body);
+  const isValidOperation = updates.every(update => allowedUpdates.includes(update));
+
+  if (!isValidOperation) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid updates"
+    });
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found"
+    });
+  }
+
+  updates.forEach(update => user[update] = req.body[update]);
+  await user.save();
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Profile updated successfully",
+    data: { user }
+  });
+});
+
+// Change password with current password verification
+export const changePassword = catchAsync(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: "Current password and new password are required"
+    });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({
+      success: false,
+      message: "New password must be at least 8 characters long"
+    });
+  }
+
+  const user = await User.findById(req.user.id).select('+password');
+  if (!user || !(await user.comparePassword(currentPassword))) {
+    return res.status(401).json({
+      success: false,
+      message: "Current password is incorrect"
+    });
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  // Force logout from all devices
+  res.clearCookie("token");
+  res.clearCookie("refreshToken");
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Password changed successfully. Please login again."
+  });
+});
+
+// Delete account with password verification
+export const deleteAccount = catchAsync(async (req, res) => {
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({
+      success: false,
+      message: "Password is required to delete account"
+    });
+  }
+
+  const user = await User.findById(req.user.id).select('+password');
+  if (!user || !(await user.comparePassword(password))) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid password"
+    });
+  }
+
+  await User.findByIdAndDelete(req.user.id);
+  
+  res.clearCookie("token");
+  res.clearCookie("refreshToken");
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "Account deleted successfully"
+  });
+});
+
