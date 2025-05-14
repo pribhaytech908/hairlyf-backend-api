@@ -228,98 +228,115 @@ export const registerUser = catchAsync(async (req, res) => {
 
 // Login with email/password
 export const loginWithEmail = catchAsync(async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  // Check for existing session
-  if (req.cookies.token) {
-    return res.status(403).json({
-      success: false,
-      message: "Already logged in"
-    });
-  }
-
-  // Input validation
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: "Email and password are required"
-    });
-  }
-
-  // Find user and check password
-  const user = await User.findOne({ email }).select("+password");
-  if (!user || !(await user.comparePassword(password))) {
-    return res.status(401).json({
-      success: false,
-      message: "Invalid credentials"
-    });
-  }
-
-  if (!user.isVerified) {
-    return res.status(403).json({
-      success: false,
-      message: "Please verify your email first"
-    });
-  }
-
-  // Generate tokens
-  const { accessToken, refreshToken } = generateTokens(user._id);
-
-  // Create session with device info
-  const deviceInfo = {
-    userAgent: req.headers['user-agent'],
-    browser: req.headers['sec-ch-ua'],
-    os: req.headers['sec-ch-ua-platform'],
-    device: req.headers['sec-ch-ua-mobile'] ? 'mobile' : 'desktop',
-    ip: req.ip
-  };
-  
-  const sessionId = await createSession(user._id, deviceInfo);
-
-  // Update last login
-  user.lastLogin = new Date();
-  await user.save();
-
-  // Set cookies
-  res.cookie("token", accessToken, {
-    ...COOKIE_OPTIONS,
-    maxAge: 24 * 60 * 60 * 1000 // 1 day
-  });
-
-  res.cookie("refreshToken", refreshToken, {
-    ...COOKIE_OPTIONS,
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-  });
-
-  // Set session cookie
-  res.cookie("sessionId", sessionId.toString(), {
-    ...COOKIE_OPTIONS,
-    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-  });
-
-  // Prepare user data without sensitive information
-  const userData = {
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    isVerified: user.isVerified,
-    lastLogin: user.lastLogin
-  };
-
-  setSecurityHeaders(res);
-  res.status(200).json({
-    success: true,
-    message: "Login successful",
-    data: {
-      user: userData,
-      tokens: {
-        accessToken,
-        refreshToken
-      },
-      sessionId
+    // Check for existing session
+    if (req.cookies.token) {
+      return res.status(403).json({
+        success: false,
+        message: "Already logged in"
+      });
     }
-  });
+
+    // Input validation
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required"
+      });
+    }
+
+    // Find user and check password
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials"
+      });
+    }
+
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials"
+      });
+    }
+
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email first"
+      });
+    }
+
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user._id);
+
+    // Create session with device info
+    const deviceInfo = {
+      userAgent: req.headers['user-agent'] || 'unknown',
+      browser: req.headers['sec-ch-ua'] || 'unknown',
+      os: req.headers['sec-ch-ua-platform'] || 'unknown',
+      device: req.headers['sec-ch-ua-mobile'] ? 'mobile' : 'desktop',
+      ip: req.ip || 'unknown'
+    };
+    
+    const sessionId = await createSession(user._id, deviceInfo);
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Set cookies
+    res.cookie("token", accessToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    // Set session cookie
+    res.cookie("sessionId", sessionId.toString(), {
+      ...COOKIE_OPTIONS,
+      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    });
+
+    // Prepare user data without sensitive information
+    const userData = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      isVerified: user.isVerified,
+      lastLogin: user.lastLogin
+    };
+
+    setSecurityHeaders(res);
+    res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: {
+        user: userData,
+        tokens: {
+          accessToken,
+          refreshToken
+        },
+        sessionId
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({
+      success: false,
+      message: "Login failed",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 });
 
 // Refresh token with enhanced security
