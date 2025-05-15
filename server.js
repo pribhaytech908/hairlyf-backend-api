@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 import connectDB from './config/db.js';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import globalErrorHandler from './middlewares/errorHandler.js';
 
 // Route Imports
 import authRoutes from './routes/authRoutes.js';
@@ -16,6 +17,11 @@ import userRoutes from './routes/userRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
 import wishlistRoutes from './routes/wishlistRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import currencyRoutes from './routes/currencyRoutes.js';
+import shippingRoutes from './routes/shippingRoutes.js';
+import blogRoutes from './routes/blogRoutes.js';
+import recommendationRoutes from './routes/recommendationRoutes.js';
 
 config(); // Load .env variables
 
@@ -32,9 +38,13 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-
 // Middlewares
 app.use(cors(corsOptions));
+
+// Special handling for Razorpay webhook
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+
+// Regular body parsing for other routes
 app.use(json());
 app.use(cookieParser());
 
@@ -54,6 +64,16 @@ app.use('/api/users', userRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/payments', paymentRoutes);
+
+// New feature routes
+app.use('/api/currencies', currencyRoutes);
+app.use('/api/shipping', shippingRoutes);
+app.use('/api/blog', blogRoutes);
+app.use('/api/recommendations', recommendationRoutes);
+
+// Error handling middleware (must be after all routes)
+app.use(globalErrorHandler);
 
 // Swagger Docs
 swaggerDocs(app);

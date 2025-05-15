@@ -163,4 +163,18 @@ export const isVerified = (req, res, next) => {
 };
 
 // Export protect as isAuthenticated for backward compatibility
-export const isAuthenticated = protect; 
+export const isAuthenticated = protect;
+
+/**
+ * Admin authorization middleware
+ * Checks if the authenticated user is an admin
+ */
+export const isAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            message: 'Access denied: Admin privileges required'
+        });
+    }
+    next();
+}; 

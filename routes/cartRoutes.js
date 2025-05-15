@@ -3,8 +3,10 @@ import { isAuthenticated } from "../middlewares/auth.js";
 import {
   getCart,
   addToCart,
+  updateCartItem,
   removeFromCart,
   clearCart,
+  saveForLater,
 } from "../controllers/cartController.js";
 
 const router = express.Router();
@@ -13,20 +15,63 @@ const router = express.Router();
  * @swagger
  * tags:
  *   name: Cart
- *   description: Cart management
+ *   description: Shopping cart management
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     CartSummary:
+ *       type: object
+ *       properties:
+ *         subtotal:
+ *           type: number
+ *         tax:
+ *           type: number
+ *         shipping:
+ *           type: number
+ *         total:
+ *           type: number
+ *         itemCount:
+ *           type: number
+ *         freeShippingThreshold:
+ *           type: number
+ *         remainingForFreeShipping:
+ *           type: number
  */
 
 /**
  * @swagger
  * /api/cart:
  *   get:
- *     summary: Get user's cart
+ *     summary: Get user's cart with detailed information
  *     tags: [Cart]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Returns the user's cart
+ *         description: Returns the user's cart with items and summary
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       product:
+ *                         type: object
+ *                       variant:
+ *                         type: object
+ *                       quantity:
+ *                         type: number
+ *                       price:
+ *                         type: number
+ *                 summary:
+ *                   $ref: '#/components/schemas/CartSummary'
  */
 router.get("/", isAuthenticated, getCart);
 
@@ -34,7 +79,7 @@ router.get("/", isAuthenticated, getCart);
  * @swagger
  * /api/cart:
  *   post:
- *     summary: Add product to cart
+ *     summary: Add product to cart with variant selection
  *     tags: [Cart]
  *     security:
  *       - bearerAuth: []
@@ -46,23 +91,31 @@ router.get("/", isAuthenticated, getCart);
  *             type: object
  *             required:
  *               - productId
+ *               - variantId
  *               - quantity
  *             properties:
  *               productId:
  *                 type: string
+ *               variantId:
+ *                 type: string
  *               quantity:
  *                 type: number
+ *                 minimum: 1
  *     responses:
  *       200:
- *         description: Product added to cart
+ *         description: Product added to cart successfully
+ *       400:
+ *         description: Invalid request or insufficient stock
+ *       404:
+ *         description: Product or variant not found
  */
 router.post("/", isAuthenticated, addToCart);
 
 /**
  * @swagger
- * /api/cart/{productId}:
- *   delete:
- *     summary: Remove a product from cart
+ * /api/cart/{productId}/{variantId}:
+ *   put:
+ *     summary: Update cart item quantity
  *     tags: [Cart]
  *     security:
  *       - bearerAuth: []
@@ -72,11 +125,59 @@ router.post("/", isAuthenticated, addToCart);
  *         required: true
  *         schema:
  *           type: string
+ *       - in: path
+ *         name: variantId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *             properties:
+ *               quantity:
+ *                 type: number
+ *                 minimum: 1
  *     responses:
  *       200:
- *         description: Product removed
+ *         description: Cart item updated successfully
+ *       400:
+ *         description: Invalid quantity or insufficient stock
+ *       404:
+ *         description: Product, variant, or cart item not found
  */
-router.delete("/:productId", isAuthenticated, removeFromCart);
+router.put("/:productId/:variantId", isAuthenticated, updateCartItem);
+
+/**
+ * @swagger
+ * /api/cart/{productId}/{variantId}:
+ *   delete:
+ *     summary: Remove a product variant from cart
+ *     tags: [Cart]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: variantId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Product removed from cart successfully
+ *       404:
+ *         description: Cart not found
+ */
+router.delete("/:productId/:variantId", isAuthenticated, removeFromCart);
 
 /**
  * @swagger
@@ -88,8 +189,35 @@ router.delete("/:productId", isAuthenticated, removeFromCart);
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Cart cleared
+ *         description: Cart cleared successfully
  */
 router.delete("/", isAuthenticated, clearCart);
+
+/**
+ * @swagger
+ * /api/cart/{productId}/{variantId}/save-for-later:
+ *   post:
+ *     summary: Move item from cart to wishlist
+ *     tags: [Cart]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: variantId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Item moved to wishlist successfully
+ *       404:
+ *         description: Cart or item not found
+ */
+router.post("/:productId/:variantId/save-for-later", isAuthenticated, saveForLater);
 
 export default router;

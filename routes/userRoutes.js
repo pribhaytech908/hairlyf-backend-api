@@ -7,8 +7,7 @@ import {
   updateUserRole,
   deleteUser
 } from "../controllers/userController.js";
-import { isAuthenticated } from "../middlewares/auth.js";
-import { isAdmin } from "../middlewares/isAdmin.js";
+import { isAuthenticated,isAdmin} from "../middlewares/auth.js";
 
 const router = express.Router();
 

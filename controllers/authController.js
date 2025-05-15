@@ -7,6 +7,7 @@ import OTP from "../models/OTP.js";
 import OTPOTP from "../models/OtpOtp.js";
 import OTPUSER from "../models/OtpUser.js";
 import Session from "../models/Session.js";
+import { catchAsync } from "../utils/catchAsync.js";
 
 // Constants
 const TOKEN_EXPIRY = {
@@ -20,13 +21,6 @@ const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict"
-};
-
-// Error Handler
-const catchAsync = (fn) => {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
 };
 
 // JWT Token Generator with different types
