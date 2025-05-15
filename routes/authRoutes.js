@@ -34,7 +34,6 @@ import express from "express";
 import {
   registerUser,
   verifyOtp,
-  resendOtp,
   loginWithEmail,
   verifyEmail,
   forgotPassword,
@@ -54,6 +53,7 @@ import {
 } from "../controllers/authController.js";
 import { protect } from '../middlewares/auth.js';
 import { rateLimiter } from '../utils/rateLimiter.js';
+
 const router = express.Router();
 
 /**
@@ -132,34 +132,6 @@ router.post("/register", rateLimiter(5, 60 * 60), registerUser);
  *         description: Too many attempts
  */
 router.post("/verify-otp", rateLimiter(5, 15 * 60), verifyOtp);
-
-/**
- * @swagger
- * /api/auth/resend-otp:
- *   post:
- *     summary: Resend verification OTP
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *     responses:
- *       200:
- *         description: OTP sent successfully
- *       404:
- *         description: User not found
- *       429:
- *         description: Too many requests
- */
-router.post("/resend-otp", rateLimiter(3, 60 * 60), resendOtp);
 
 /**
  * @swagger

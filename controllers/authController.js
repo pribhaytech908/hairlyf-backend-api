@@ -330,11 +330,19 @@ export const loginWithEmail = catchAsync(async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
     return res.status(500).json({
       success: false,
       message: "Login failed",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        type: error.name
+      } : undefined
     });
   }
 });
