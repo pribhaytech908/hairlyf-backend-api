@@ -19,8 +19,8 @@ const TOKEN_EXPIRY = {
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "strict"
+  sameSite: "None",
+  path: "/",
 };
 
 // JWT Token Generator with different types
