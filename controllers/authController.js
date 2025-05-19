@@ -955,3 +955,24 @@ export const updateLastActive = catchAsync(async (req, res) => {
   });
 });
 
+// Check authentication status
+export const checkAuth = catchAsync(async (req, res) => {
+  // If we reach here, it means the protect middleware has already verified the token
+  // and attached the user to the request object
+  const user = await User.findById(req.user.id).select('-password');
+
+  if (!user) {
+    return res.status(401).json({
+      success: false,
+      message: "User not found"
+    });
+  }
+
+  setSecurityHeaders(res);
+  res.status(200).json({
+    success: true,
+    message: "User is authenticated",
+    data: { user }
+  });
+});
+

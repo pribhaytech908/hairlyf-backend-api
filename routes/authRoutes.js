@@ -50,6 +50,7 @@ import {
   logoutFromSession,
   logoutFromAllDevices,
   updateLastActive,
+  checkAuth,
 } from "../controllers/authController.js";
 import { protect } from '../middlewares/auth.js';
 import { rateLimiter } from '../utils/rateLimiter.js';
@@ -571,5 +572,35 @@ router.delete('/sessions', logoutFromAllDevices);
  *         description: Not authenticated
  */
 router.post('/sessions/heartbeat', updateLastActive);
+
+/**
+ * @swagger
+ * /api/auth/check:
+ *   get:
+ *     summary: Check if user is authenticated
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User is authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *       401:
+ *         description: User is not authenticated
+ */
+router.get("/check", protect, checkAuth);
 
 export default router;
