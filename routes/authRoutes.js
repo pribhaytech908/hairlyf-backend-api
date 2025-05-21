@@ -51,6 +51,7 @@ import {
   logoutFromAllDevices,
   updateLastActive,
   checkAuth,
+  getMe,
 } from "../controllers/authController.js";
 import { protect } from '../middlewares/auth.js';
 import { rateLimiter } from '../utils/rateLimiter.js';
@@ -602,5 +603,71 @@ router.post('/sessions/heartbeat', updateLastActive);
  *         description: User is not authenticated
  */
 router.get("/check", protect, checkAuth);
+
+
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get details of the current authenticated user
+ *     description: This endpoint returns the user details of the currently authenticated user.
+ *     tags:
+ *       - Authentication
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully fetched user details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                       example: "60b6c0f5f1a2d6cd98f6e7e2"
+ *                     name:
+ *                       type: string
+ *                       example: "John Doe"
+ *                     email:
+ *                       type: string
+ *                       example: "johndoe@example.com"
+ *                     phone:
+ *                       type: string
+ *                       example: "+1234567890"
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Not authenticated"
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Server error while fetching user info"
+ */
+router.get('/me', protect, getMe);
 
 export default router;
