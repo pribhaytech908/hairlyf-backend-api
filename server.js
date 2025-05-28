@@ -22,8 +22,6 @@ import currencyRoutes from './routes/currencyRoutes.js';
 import shippingRoutes from './routes/shippingRoutes.js';
 import blogRoutes from './routes/blogRoutes.js';
 import recommendationRoutes from './routes/recommendationRoutes.js';
-import proxyRoutes from './routes/proxyRoutes.js';
-import uploadRoutes from './routes/uploadRoutes.js';
 config(); // Load .env variables
 
 connectDB();
@@ -74,8 +72,6 @@ app.use('/api/currencies', currencyRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/recommendations', recommendationRoutes);
-app.use('/api/proxy', proxyRoutes);
-app.use('/api',uploadRoutes);
 // Error handling middleware (must be after all routes)
 app.use(globalErrorHandler);
 
