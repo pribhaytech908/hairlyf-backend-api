@@ -31,7 +31,8 @@ const corsOptions = {
   origin: [
     'http://localhost:5173',                      // frontend
     'https://hairlyf-backend-api.onrender.com',   // production API
-    'http://localhost:5000',                      // Swagger UI (and local backend docs)
+    'http://localhost:5000',
+    'https://hairlyf.vercel.app/'                    // Swagger UI (and local backend docs)
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
