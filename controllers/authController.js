@@ -20,6 +20,7 @@ const TOKEN_EXPIRY = {
 const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "None",
+  secure: true,
   path: "/",
 };
 
