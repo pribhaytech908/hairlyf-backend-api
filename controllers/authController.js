@@ -319,9 +319,9 @@ export const loginWithEmail = catchAsync(async (req, res) => {
         user: userData,
         tokens: {
           accessToken,
-          refreshToken
-        },
-        sessionId
+          refreshToken,
+          sessionId: sessionId.toString()
+        }
       }
     });
   } catch (error) {
