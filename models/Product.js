@@ -20,26 +20,24 @@ const productSchema = new Schema({
     },
   ],
   variants: [variantSchema], // Each combination of size + color + price + qty
-
   description: {
     type: String,
     required: [true, 'Description is required'],
   },
-
   details: {
     type: String,
   },
-
   category: {
     type: String,
     enum: ['men', 'women'],
     required: [true, 'Category is required'],
   },
-
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
 productSchema.index({ name: "text", description: "text", category: "text" });
+
 export default model('Product', productSchema);

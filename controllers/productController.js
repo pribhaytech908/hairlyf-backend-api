@@ -5,41 +5,63 @@ import mongoose from 'mongoose';
 // Create a new product
 export const createProduct = async (req, res) => {
   try {
-    const {
-      name,
-      description,
-      details,
-      category,
-      variants
-    } = req.body;
+    const { name, description, details, category, brand, tags, status, createdBy, updatedBy } = req.body;
 
-    const files = req.files || [];
+    // Parse variants if sent as JSON string
+    let variants = req.body.variants;
+    if (typeof variants === 'string') {
+      try {
+        variants = JSON.parse(variants);
+      } catch {
+        return res.status(400).json({ success: false, message: 'Invalid variants format' });
+      }
+    }
+
+    // Validate required fields
+    if (!name || !description || !category || !variants || !Array.isArray(variants)) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
 
     // Upload images to cloudinary
+    const files = req.files || [];
     const images = [];
     for (const file of files) {
       const result = await uploadImageToCloudinary(file.path);
-      images.push({ public_id: result.public_id, url: result.secure_url });
+      images.push({ public_id: result.public_id, url: result.url });
     }
 
-    // Create variants array from the provided data
-    const processedVariants = Array.isArray(variants) 
-      ? variants.map(variant => ({
-          size: variant.size,
-          color: variant.color,
-          price: parseFloat(variant.price),
-          quantity: parseInt(variant.quantity)
-        }))
-      : [];
+    // Process variants
+    const processedVariants = variants.map(variant => ({
+      size: variant.size,
+      color: variant.color,
+      price: parseFloat(variant.price),
+      quantity: parseInt(variant.quantity)
+    }));
+
+    // Parse tags if sent as string
+    let tagsArray = [];
+    if (tags) {
+      if (typeof tags === 'string') {
+        tagsArray = tags.split(',').map(t => t.trim());
+      } else if (Array.isArray(tags)) {
+        tagsArray = tags;
+      }
+    }
 
     const product = await Product.create({
       name,
       description,
       details,
       category,
+      brand,
+      tags: tagsArray,
+      status,
       images,
       variants: processedVariants,
-      createdAt: new Date()
+      createdBy,
+      updatedBy,
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
 
     res.status(201).json({
@@ -48,12 +70,10 @@ export const createProduct = async (req, res) => {
       message: 'Product created successfully'
     });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 // Get all products with filtering, sorting, and pagination
 export const getAllProducts = async (req, res) => {
