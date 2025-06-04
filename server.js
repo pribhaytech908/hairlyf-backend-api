@@ -32,7 +32,8 @@ const corsOptions = {
     'https://hairlyf-backend-api.onrender.com',   // production API
     'http://localhost:5000',
     'https://hairlyf.vercel.app',
-    'https://hairlyf-princes-projects-0a724ba8.vercel.app'
+    'https://hairlyf-princes-projects-0a724ba8.vercel.app',
+    'https://staging-three-tan.vercel.app'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
