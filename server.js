@@ -31,7 +31,8 @@ const corsOptions = {
     'http://localhost:5173',                      // frontend
     'https://hairlyf-backend-api.onrender.com',   // production API
     'http://localhost:5000',
-    'https://main.d33h5fmwdiww8b.amplifyapp.com'
+    'https://main.d33h5fmwdiww8b.amplifyapp.com',
+    'https://main.d3tqy4xj2yse0u.amplifyapp.com'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
