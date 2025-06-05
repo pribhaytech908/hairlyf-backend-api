@@ -98,7 +98,7 @@ const router = express.Router();
  *       429:
  *         description: Too many requests
  */
-router.post("/register", rateLimiter(5, 60 * 60), registerUser);
+router.post("/register", registerUser);
 
 /**
  * @swagger
