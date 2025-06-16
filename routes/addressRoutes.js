@@ -69,7 +69,62 @@ router.get("/:id", isAuthenticated, getAddressById);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Address'
+ *             type: object
+ *             required:
+ *               - fullName
+ *               - mobileNumber
+ *               - addressLine1
+ *               - city
+ *               - district
+ *               - state
+ *               - pincode
+ *             properties:
+ *               label:
+ *                 type: string
+ *                 enum: [Home, Work, Other]
+ *                 default: Home
+ *               fullName:
+ *                 type: string
+ *                 example: "Rahul Sharma"
+ *               mobileNumber:
+ *                 type: string
+ *                 example: "9876543210"
+ *               alternatePhone:
+ *                 type: string
+ *                 example: "9123456789"
+ *               addressLine1:
+ *                 type: string
+ *                 example: "123, Sector 21"
+ *               addressLine2:
+ *                 type: string
+ *                 example: "Near City Mall"
+ *               landmark:
+ *                 type: string
+ *                 example: "Opposite petrol pump"
+ *               city:
+ *                 type: string
+ *                 example: "Lucknow"
+ *               district:
+ *                 type: string
+ *                 example: "Lucknow"
+ *               state:
+ *                 type: string
+ *                 enum:
+ *                   - Uttar Pradesh
+ *                   - Delhi
+ *                   - Maharashtra
+ *                   - Tamil Nadu
+ *                   - Karnataka
+ *                 example: "Uttar Pradesh"
+ *               pincode:
+ *                 type: string
+ *                 example: "226010"
+ *               country:
+ *                 type: string
+ *                 default: "India"
+ *               isDefault:
+ *                 type: boolean
+ *                 default: false
  *     responses:
  *       201:
  *         description: Address created successfully
