@@ -7,6 +7,7 @@ import {
   removeFromCart,
   clearCart,
   saveForLater,
+  mergeGuestCart
 } from "../controllers/cartController.js";
 
 const router = express.Router();
@@ -73,7 +74,7 @@ const router = express.Router();
  *                 summary:
  *                   $ref: '#/components/schemas/CartSummary'
  */
-router.get("/", isAuthenticated, getCart);
+router.get("/", getCart);
 
 /**
  * @swagger
@@ -109,7 +110,7 @@ router.get("/", isAuthenticated, getCart);
  *       404:
  *         description: Product or variant not found
  */
-router.post("/", isAuthenticated, addToCart);
+router.post("/", addToCart);
 
 /**
  * @swagger
@@ -150,7 +151,7 @@ router.post("/", isAuthenticated, addToCart);
  *       404:
  *         description: Product, variant, or cart item not found
  */
-router.put("/:productId/:variantId", isAuthenticated, updateCartItem);
+router.put("/:productId/:variantId", updateCartItem);
 
 /**
  * @swagger
@@ -177,7 +178,7 @@ router.put("/:productId/:variantId", isAuthenticated, updateCartItem);
  *       404:
  *         description: Cart not found
  */
-router.delete("/:productId/:variantId", isAuthenticated, removeFromCart);
+router.delete("/:productId/:variantId", removeFromCart);
 
 /**
  * @swagger
@@ -191,7 +192,7 @@ router.delete("/:productId/:variantId", isAuthenticated, removeFromCart);
  *       200:
  *         description: Cart cleared successfully
  */
-router.delete("/", isAuthenticated, clearCart);
+router.delete("/", clearCart);
 
 /**
  * @swagger
@@ -219,5 +220,19 @@ router.delete("/", isAuthenticated, clearCart);
  *         description: Cart or item not found
  */
 router.post("/:productId/:variantId/save-for-later", isAuthenticated, saveForLater);
+
+/**
+ * @swagger
+ * /api/cart/merge-guest-cart:
+ *   post:
+ *     summary: Merge guest cart with user cart
+ *     tags: [Cart]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Guest cart merged with user cart successfully
+ */
+router.post("/merge-guest-cart", isAuthenticated, mergeGuestCart);
 
 export default router;
