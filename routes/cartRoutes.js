@@ -1,14 +1,14 @@
 import express from "express";
-import { isAuthenticated } from "../middlewares/auth.js";
 import {
-  getCart,
   addToCart,
-  updateCartItem,
-  removeFromCart,
   clearCart,
+  getCart,
+  mergeGuestCart,
+  removeFromCart,
   saveForLater,
-  mergeGuestCart
+  updateCartItem,
 } from "../controllers/cartController.js";
+import { isAuthenticated, protect } from "../middlewares/auth.js";
 
 const router = express.Router();
 
@@ -74,7 +74,7 @@ const router = express.Router();
  *                 summary:
  *                   $ref: '#/components/schemas/CartSummary'
  */
-router.get("/", getCart);
+router.get("/", protect, getCart);
 
 /**
  * @swagger
@@ -110,7 +110,7 @@ router.get("/", getCart);
  *       404:
  *         description: Product or variant not found
  */
-router.post("/", addToCart);
+router.post("/", protect, addToCart);
 
 /**
  * @swagger
@@ -219,7 +219,11 @@ router.delete("/", clearCart);
  *       404:
  *         description: Cart or item not found
  */
-router.post("/:productId/:variantId/save-for-later", isAuthenticated, saveForLater);
+router.post(
+  "/:productId/:variantId/save-for-later",
+  isAuthenticated,
+  saveForLater
+);
 
 /**
  * @swagger
