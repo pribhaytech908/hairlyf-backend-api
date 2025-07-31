@@ -25,7 +25,7 @@ export const getCart = async (req, res) => {
     console.log("GET cartIdentifier", cartIdentifier);
     const cart = await Cart.findOne(cartIdentifier).populate({
       path: "items.product",
-      select: "name images variants description category",
+      select: "name images variants description category originalPrice stock",
     });
 
     console.log("GET cart", cart);
@@ -35,18 +35,28 @@ export const getCart = async (req, res) => {
         items: [],
         summary: {
           subtotal: 0,
+          totalMRP: 0,
+          discount: 0,
           tax: 0,
           shipping: 0,
           total: 0,
           itemCount: 0,
+          freeShippingThreshold: 500,
+          remainingForFreeShipping: 500,
         },
       });
     }
 
-    const summary = await calculateCartSummary(cart);
+    const formattedItems = cart.getFormattedItems();
+    const summary = cart.calculateTotals();
 
-    res.status(200).json({ items: cart.items, summary });
+    res.status(200).json({ 
+      items: formattedItems, 
+      summary,
+      message: "Cart retrieved successfully"
+    });
   } catch (error) {
+    console.error("Get cart error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -101,11 +111,15 @@ export const addToCart = async (req, res) => {
 
     await cart.save();
 
-    const updatedCart = await Cart.findById(cart._id).populate("items.product");
-    const summary = await calculateCartSummary(updatedCart);
+    const updatedCart = await Cart.findById(cart._id).populate({
+      path: "items.product",
+      select: "name images variants description category originalPrice stock",
+    });
+    const formattedItems = updatedCart.getFormattedItems();
+    const summary = updatedCart.calculateTotals();
 
     res.status(200).json({
-      items: updatedCart.items,
+      items: formattedItems,
       summary,
       message: "Product added to cart successfully",
     });
@@ -153,11 +167,15 @@ export const updateCartItem = async (req, res) => {
 
     await cart.save();
 
-    const updatedCart = await Cart.findById(cart._id).populate("items.product");
-    const summary = await calculateCartSummary(updatedCart);
+    const updatedCart = await Cart.findById(cart._id).populate({
+      path: "items.product",
+      select: "name images variants description category originalPrice stock",
+    });
+    const formattedItems = updatedCart.getFormattedItems();
+    const summary = updatedCart.calculateTotals();
 
     res.status(200).json({
-      items: updatedCart.items,
+      items: formattedItems,
       summary,
       message: "Cart updated successfully",
     });
@@ -182,11 +200,15 @@ export const removeFromCart = async (req, res) => {
 
     await cart.save();
 
-    const updatedCart = await Cart.findById(cart._id).populate("items.product");
-    const summary = await calculateCartSummary(updatedCart);
+    const updatedCart = await Cart.findById(cart._id).populate({
+      path: "items.product",  
+      select: "name images variants description category originalPrice stock",
+    });
+    const formattedItems = updatedCart.getFormattedItems();
+    const summary = updatedCart.calculateTotals();
 
     res.status(200).json({
-      items: updatedCart.items,
+      items: formattedItems,
       summary,
       message: "Item removed from cart successfully",
     });
@@ -202,14 +224,19 @@ export const clearCart = async (req, res) => {
   try {
     await Cart.findOneAndDelete(cartIdentifier);
     res.status(200).json({
-      message: "Cart cleared successfully",
+      items: [],
       summary: {
         subtotal: 0,
+        totalMRP: 0,
+        discount: 0,
         tax: 0,
         shipping: 0,
         total: 0,
         itemCount: 0,
+        freeShippingThreshold: 500,
+        remainingForFreeShipping: 500,
       },
+      message: "Cart cleared successfully",
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -242,11 +269,15 @@ export const saveForLater = async (req, res) => {
       { upsert: true }
     );
 
-    const updatedCart = await Cart.findById(cart._id).populate("items.product");
-    const summary = await calculateCartSummary(updatedCart);
+    const updatedCart = await Cart.findById(cart._id).populate({
+      path: "items.product",
+      select: "name images variants description category originalPrice stock",
+    });
+    const formattedItems = updatedCart.getFormattedItems();
+    const summary = updatedCart.calculateTotals();
 
     res.status(200).json({
-      items: updatedCart.items,
+      items: formattedItems,
       summary,
       message: "Item moved to wishlist successfully",
     });
@@ -288,13 +319,15 @@ export const mergeGuestCart = async (req, res) => {
     await Cart.deleteOne({ sessionId });
     res.clearCookie("cartSessionId");
 
-    const updatedCart = await Cart.findById(userCart._id).populate(
-      "items.product"
-    );
-    const summary = await calculateCartSummary(updatedCart);
+    const updatedCart = await Cart.findById(userCart._id).populate({
+      path: "items.product",
+      select: "name images variants description category originalPrice stock",
+    });
+    const formattedItems = updatedCart.getFormattedItems();
+    const summary = updatedCart.calculateTotals();
 
     res.status(200).json({
-      items: updatedCart.items,
+      items: formattedItems,
       summary,
       message: "Guest cart merged successfully",
     });
@@ -303,23 +336,4 @@ export const mergeGuestCart = async (req, res) => {
   }
 };
 
-// ✅ Calculate Cart Summary
-async function calculateCartSummary(cart) {
-  const subtotal = cart.items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
-  const tax = subtotal * 0.1;
-  const shipping = subtotal > 50 ? 0 : 5;
-  const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
-
-  return {
-    subtotal,
-    tax,
-    shipping,
-    total: subtotal + tax + shipping,
-    itemCount,
-    freeShippingThreshold: 50,
-    remainingForFreeShipping: Math.max(0, 50 - subtotal),
-  };
-}
+// Note: Cart summary calculation is now handled by the Cart model's calculateTotals method
