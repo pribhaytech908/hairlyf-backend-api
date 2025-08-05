@@ -22,13 +22,14 @@ const getCartIdentifier = (req, res) => {
 export const getCart = async (req, res) => {
   try {
     const cartIdentifier = getCartIdentifier(req, res);
-    console.log("GET cartIdentifier", cartIdentifier);
+    console.log("GET cartIdentifier:", cartIdentifier);
+    
     const cart = await Cart.findOne(cartIdentifier).populate({
       path: "items.product",
       select: "name images variants description category originalPrice stock",
     });
 
-    console.log("GET cart", cart);
+    console.log("GET cart found:", cart ? "Yes" : "No");
 
     if (!cart) {
       return res.status(200).json({
@@ -65,7 +66,6 @@ export const getCart = async (req, res) => {
 export const addToCart = async (req, res) => {
   const { productId, quantity, variantId } = req.body;
   const cartIdentifier = getCartIdentifier(req, res);
-  console.log("POST cartIdentifier", cartIdentifier);
 
   try {
     const product = await Product.findById(productId);
@@ -83,7 +83,6 @@ export const addToCart = async (req, res) => {
     }
 
     let cart = await Cart.findOne(cartIdentifier);
-    console.log("cart", cart);
     if (!cart) cart = new Cart({ ...cartIdentifier, items: [] });
 
     const existingItem = cart.items.find(
@@ -222,7 +221,12 @@ export const clearCart = async (req, res) => {
   const cartIdentifier = getCartIdentifier(req, res);
 
   try {
-    await Cart.findOneAndDelete(cartIdentifier);
+    console.log("Clearing cart with identifier:", cartIdentifier);
+    
+    // Find and delete all carts matching the identifier
+    const deleteResult = await Cart.deleteMany(cartIdentifier);
+    console.log("Deleted", deleteResult.deletedCount, "cart(s)");
+    
     res.status(200).json({
       items: [],
       summary: {
@@ -239,6 +243,7 @@ export const clearCart = async (req, res) => {
       message: "Cart cleared successfully",
     });
   } catch (error) {
+    console.error("Error clearing cart:", error);
     res.status(500).json({ message: error.message });
   }
 };

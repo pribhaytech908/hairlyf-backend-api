@@ -151,7 +151,7 @@ router.post("/", protect, addToCart);
  *       404:
  *         description: Product, variant, or cart item not found
  */
-router.put("/:productId/:variantId", updateCartItem);
+router.put("/:productId/:variantId", protect, updateCartItem);
 
 /**
  * @swagger
@@ -178,7 +178,7 @@ router.put("/:productId/:variantId", updateCartItem);
  *       404:
  *         description: Cart not found
  */
-router.delete("/:productId/:variantId", removeFromCart);
+router.delete("/:productId/:variantId", protect, removeFromCart);
 
 /**
  * @swagger
@@ -192,7 +192,7 @@ router.delete("/:productId/:variantId", removeFromCart);
  *       200:
  *         description: Cart cleared successfully
  */
-router.delete("/", clearCart);
+router.delete("/", protect, clearCart);
 
 /**
  * @swagger

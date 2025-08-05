@@ -4,7 +4,9 @@ import {
   getAddressById,
   addAddress,
   updateAddress,
-  deleteAddress
+  deleteAddress,
+  setDefaultAddress,
+  getDefaultAddress
 } from "../controllers/addressController.js";
 import { isAuthenticated } from "../middlewares/auth.js";
 
@@ -32,6 +34,22 @@ const router = express.Router();
  *         description: Unauthorized access
  */
 router.get("/", isAuthenticated, getAllAddresses);
+
+/**
+ * @swagger
+ * /api/addresses/default:
+ *   get:
+ *     summary: Get the default address of the logged-in user
+ *     tags: [Addresses]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved default address
+ *       404:
+ *         description: No default address found
+ */
+router.get("/default", isAuthenticated, getDefaultAddress);
 
 /**
  * @swagger
@@ -184,5 +202,28 @@ router.put("/:id", isAuthenticated, updateAddress);
  *         description: Address not found
  */
 router.delete("/:id", isAuthenticated, deleteAddress);
+
+/**
+ * @swagger
+ * /api/addresses/{id}/default:
+ *   patch:
+ *     summary: Set an address as default
+ *     tags: [Addresses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID of the address to set as default
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Default address updated successfully
+ *       404:
+ *         description: Address not found
+ */
+router.patch("/:id/default", isAuthenticated, setDefaultAddress);
 
 export default router;
