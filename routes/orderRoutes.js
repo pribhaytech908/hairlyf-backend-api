@@ -60,7 +60,7 @@ const router = express.Router();
  *         name: status
  *         schema:
  *           type: string
- *           enum: [Processing, Shipped, Delivered, Cancelled]
+ *           enum: [Pending, Processing, Shipped, Delivered, Cancelled]
  *         description: Filter orders by status
  *     responses:
  *       200:

@@ -32,7 +32,7 @@ export const createOrder = async (req, res) => {
       orderNumber: await generateOrderNumber(),
       estimatedDeliveryDate: calculateEstimatedDelivery(),
       paymentStatus: paymentMethod === 'COD' ? 'Pending' : 'Pending', // COD will be marked as Paid on delivery
-      orderStatus: paymentMethod === 'COD' ? 'Processing' : 'Pending', // COD orders can be processed immediately
+      orderStatus: paymentMethod === 'COD' ? 'Processing' : 'Pending', // UPI orders start as Pending until payment
     });
 
     // For COD orders, deduct stock immediately
@@ -176,7 +176,7 @@ export const getUserOrders = async (req, res) => {
     const status = req.query.status;
 
     let query = { user: req.user._id };
-    if (status) {
+    if (status && status !== 'all') {
       query.orderStatus = status;
     }
 
@@ -270,7 +270,7 @@ export const cancelOrder = async (req, res) => {
     }
 
     // Check if order can be cancelled
-    if (!["Processing", "Pending"].includes(order.orderStatus)) {
+    if (!["Pending", "Processing"].includes(order.orderStatus)) {
       return res.status(400).json({ 
         message: "Order cannot be cancelled at this stage" 
       });
