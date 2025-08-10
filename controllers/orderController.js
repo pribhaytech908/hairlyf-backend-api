@@ -3,37 +3,127 @@ import Product from "../models/Product.js";
 import { Cart } from "../models/Cart.js";
 import mongoose from "mongoose";
 
-// Create a new order
+// Create a new order (for pending payment)
 export const createOrder = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const { address, items, totalAmount, paymentMethod } = req.body;
+    const { address, items, totalAmount, paymentMethod, deliveryOption } = req.body;
 
-    // Validate items stock
+    // Validate items stock (but don't deduct yet - only deduct after payment confirmation)
     for (const item of items) {
       const product = await Product.findById(item.productId).select('variants');
+      if (!product) {
+        throw new Error(`Product ${item.productId} not found`);
+      }
       const variant = product.variants.id(item.variantId);
       
       if (!variant || variant.quantity < item.quantity) {
-        throw new Error(`Insufficient stock for product ${item.productId}`);
+        throw new Error(`Insufficient stock for product ${product.name || item.productId}`);
       }
     }
 
-    // Create order
-    const order = await Order.create([{
+    // Create order with pending payment status
+    const order = await Order.create({
       user: req.user._id,
       address,
       items,
       totalAmount,
       paymentMethod,
+      deliveryOption: deliveryOption || 'standard',
       orderNumber: await generateOrderNumber(),
-      estimatedDeliveryDate: calculateEstimatedDelivery()
-    }], { session });
+      estimatedDeliveryDate: calculateEstimatedDelivery(),
+      paymentStatus: paymentMethod === 'COD' ? 'Pending' : 'Pending', // COD will be marked as Paid on delivery
+      orderStatus: paymentMethod === 'COD' ? 'Processing' : 'Pending', // UPI orders start as Pending until payment
+    });
+
+    // For COD orders, deduct stock immediately
+    if (paymentMethod === 'COD') {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      
+      try {
+        // Update product stock
+        for (const item of items) {
+          await Product.findOneAndUpdate(
+            { 
+              _id: item.productId,
+              "variants._id": item.variantId
+            },
+            { 
+              $inc: { "variants.$.quantity": -item.quantity }
+            },
+            { session }
+          );
+        }
+
+        // Clear user's cart
+        await Cart.findOneAndDelete({ user: req.user._id }, { session });
+
+        await session.commitTransaction();
+      } catch (error) {
+        await session.abortTransaction();
+        // Delete the order if stock update fails
+        await Order.findByIdAndDelete(order._id);
+        throw error;
+      } finally {
+        session.endSession();
+      }
+    }
+
+    // Populate order details
+    const populatedOrder = await Order.findById(order._id)
+      .populate("address")
+      .populate("items.productId")
+      .populate("user", "name email");
+
+    res.status(201).json({
+      success: true,
+      order: populatedOrder,
+      message: paymentMethod === 'COD' ? "Order placed successfully" : "Order created, pending payment"
+    });
+  } catch (error) {
+    res.status(400).json({ 
+      success: false, 
+      message: error.message || "Error creating order"
+    });
+  }
+};
+
+// Confirm order after successful payment
+export const confirmOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findOne({
+      _id: orderId,
+      user: req.user._id,
+      paymentStatus: 'Pending'
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found or already confirmed'
+      });
+    }
+
+    // Validate stock again before confirming
+    for (const item of order.items) {
+      const product = await Product.findById(item.productId).select('variants');
+      if (!product) {
+        throw new Error(`Product ${item.productId} not found`);
+      }
+      const variant = product.variants.id(item.variantId);
+      
+      if (!variant || variant.quantity < item.quantity) {
+        throw new Error(`Insufficient stock for product ${product.name || item.productId}`);
+      }
+    }
 
     // Update product stock
-    for (const item of items) {
+    for (const item of order.items) {
       await Product.findOneAndUpdate(
         { 
           _id: item.productId,
@@ -46,27 +136,32 @@ export const createOrder = async (req, res) => {
       );
     }
 
+    // Update order status
+    order.orderStatus = 'Processing';
+    order.paymentStatus = 'Paid';
+    await order.save({ session });
+
     // Clear user's cart
     await Cart.findOneAndDelete({ user: req.user._id }, { session });
 
     await session.commitTransaction();
 
     // Populate order details
-    const populatedOrder = await Order.findById(order[0]._id)
+    const populatedOrder = await Order.findById(order._id)
       .populate("address")
       .populate("items.productId")
       .populate("user", "name email");
 
-    res.status(201).json({
+    res.status(200).json({
       success: true,
       order: populatedOrder,
-      message: "Order placed successfully"
+      message: "Order confirmed successfully"
     });
   } catch (error) {
     await session.abortTransaction();
     res.status(400).json({ 
       success: false, 
-      message: error.message || "Error creating order"
+      message: error.message || "Error confirming order"
     });
   } finally {
     session.endSession();
@@ -81,7 +176,7 @@ export const getUserOrders = async (req, res) => {
     const status = req.query.status;
 
     let query = { user: req.user._id };
-    if (status) {
+    if (status && status !== 'all') {
       query.orderStatus = status;
     }
 
@@ -175,7 +270,7 @@ export const cancelOrder = async (req, res) => {
     }
 
     // Check if order can be cancelled
-    if (!["Processing", "Pending"].includes(order.orderStatus)) {
+    if (!["Pending", "Processing"].includes(order.orderStatus)) {
       return res.status(400).json({ 
         message: "Order cannot be cancelled at this stage" 
       });

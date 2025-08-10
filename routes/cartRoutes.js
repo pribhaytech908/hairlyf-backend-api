@@ -1,14 +1,14 @@
 import express from "express";
-import { isAuthenticated } from "../middlewares/auth.js";
 import {
-  getCart,
   addToCart,
-  updateCartItem,
-  removeFromCart,
   clearCart,
+  getCart,
+  mergeGuestCart,
+  removeFromCart,
   saveForLater,
-  mergeGuestCart
+  updateCartItem,
 } from "../controllers/cartController.js";
+import { isAuthenticated, protect } from "../middlewares/auth.js";
 
 const router = express.Router();
 
@@ -74,7 +74,7 @@ const router = express.Router();
  *                 summary:
  *                   $ref: '#/components/schemas/CartSummary'
  */
-router.get("/", getCart);
+router.get("/", protect, getCart);
 
 /**
  * @swagger
@@ -110,7 +110,7 @@ router.get("/", getCart);
  *       404:
  *         description: Product or variant not found
  */
-router.post("/", addToCart);
+router.post("/", protect, addToCart);
 
 /**
  * @swagger
@@ -151,7 +151,7 @@ router.post("/", addToCart);
  *       404:
  *         description: Product, variant, or cart item not found
  */
-router.put("/:productId/:variantId", updateCartItem);
+router.put("/:productId/:variantId", protect, updateCartItem);
 
 /**
  * @swagger
@@ -178,7 +178,7 @@ router.put("/:productId/:variantId", updateCartItem);
  *       404:
  *         description: Cart not found
  */
-router.delete("/:productId/:variantId", removeFromCart);
+router.delete("/:productId/:variantId", protect, removeFromCart);
 
 /**
  * @swagger
@@ -192,7 +192,7 @@ router.delete("/:productId/:variantId", removeFromCart);
  *       200:
  *         description: Cart cleared successfully
  */
-router.delete("/", clearCart);
+router.delete("/", protect, clearCart);
 
 /**
  * @swagger
@@ -219,7 +219,11 @@ router.delete("/", clearCart);
  *       404:
  *         description: Cart or item not found
  */
-router.post("/:productId/:variantId/save-for-later", isAuthenticated, saveForLater);
+router.post(
+  "/:productId/:variantId/save-for-later",
+  isAuthenticated,
+  saveForLater
+);
 
 /**
  * @swagger

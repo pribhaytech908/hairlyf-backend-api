@@ -1,11 +1,13 @@
 import express from "express";
 import {
   createOrder,
+  confirmOrder,
   getUserOrders,
   getOrderById,
   cancelOrder,
   requestReturn
 } from "../controllers/orderController.js";
+import { downloadInvoice } from "../controllers/invoiceController.js";
 import { isAuthenticated } from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -58,7 +60,7 @@ const router = express.Router();
  *         name: status
  *         schema:
  *           type: string
- *           enum: [Processing, Shipped, Delivered, Cancelled]
+ *           enum: [Pending, Processing, Shipped, Delivered, Cancelled]
  *         description: Filter orders by status
  *     responses:
  *       200:
@@ -186,6 +188,30 @@ router.post("/", isAuthenticated, createOrder);
 
 /**
  * @swagger
+ * /api/orders/{id}/confirm:
+ *   post:
+ *     summary: Confirm order after successful payment
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order confirmed successfully
+ *       400:
+ *         description: Invalid request or insufficient stock
+ *       404:
+ *         description: Order not found
+ */
+router.post("/:id/confirm", isAuthenticated, confirmOrder);
+
+/**
+ * @swagger
  * /api/orders/{id}/cancel:
  *   post:
  *     summary: Cancel an order and restore stock
@@ -256,5 +282,8 @@ router.post("/:id/cancel", isAuthenticated, cancelOrder);
  *         description: Order not found
  */
 router.post("/:id/return", isAuthenticated, requestReturn);
+
+// Download invoice route
+router.get("/:id/invoice", isAuthenticated, downloadInvoice);
 
 export default router;
