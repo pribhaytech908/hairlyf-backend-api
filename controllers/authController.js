@@ -395,15 +395,64 @@ export const refreshToken = catchAsync(async (req, res) => {
 
 // Logout with session cleanup
 export const logoutUser = catchAsync(async (req, res) => {
-  // Clear all cookies
-  res.clearCookie("token");
-  res.clearCookie("refreshToken");
+  try {
+    // Get sessionId from cookie if it exists
+    const sessionId = req.cookies.sessionId;
+    
+    // If sessionId exists, mark the session as inactive in database
+    if (sessionId) {
+      try {
+        await Session.findByIdAndUpdate(
+          sessionId,
+          { isActive: false },
+          { new: true }
+        );
+      } catch (sessionError) {
+        console.warn('Failed to update session status:', sessionError.message);
+        // Continue with logout even if session update fails
+      }
+    }
 
-  setSecurityHeaders(res);
-  res.status(200).json({
-    success: true,
-    message: "Logged out successfully"
-  });
+    // Clear all authentication-related cookies
+    res.clearCookie("token", {
+      httpOnly: true,
+      sameSite: "None",
+      secure: true,
+      path: "/"
+    });
+    
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      sameSite: "None", 
+      secure: true,
+      path: "/"
+    });
+    
+    res.clearCookie("sessionId", {
+      httpOnly: true,
+      sameSite: "None",
+      secure: true, 
+      path: "/"
+    });
+
+    setSecurityHeaders(res);
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully"
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    
+    // Even if there's an error, clear cookies on client side
+    res.clearCookie("token");
+    res.clearCookie("refreshToken");
+    res.clearCookie("sessionId");
+    
+    return res.status(500).json({
+      success: false,
+      message: "Error during logout, but cookies cleared"
+    });
+  }
 });
 
 // Forgot password with rate limiting
