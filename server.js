@@ -1,9 +1,12 @@
 import express, { json } from 'express';
-import { config } from 'dotenv';
+import validateEnvironment from './config/environment.js';
 import connectDB from './config/db.js';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import globalErrorHandler from './middlewares/errorHandler.js';
+
+// Validate environment variables before starting server
+validateEnvironment();
 
 // Route Imports
 import authRoutes from './routes/authRoutes.js';
@@ -22,7 +25,6 @@ import currencyRoutes from './routes/currencyRoutes.js';
 import shippingRoutes from './routes/shippingRoutes.js';
 import blogRoutes from './routes/blogRoutes.js';
 import recommendationRoutes from './routes/recommendationRoutes.js';
-config(); // Load .env variables
 
 connectDB();
 const app = express();
@@ -30,7 +32,7 @@ const corsOptions = {
   origin: [
     'http://localhost:5173',                      // frontend
     'https://hairlyf-backend-api.onrender.com',   // production API
-    'http://localhost:5000',
+    'http://localhost:8080',                      // local backend API
     'https://main.d33h5fmwdiww8b.amplifyapp.com',
     'https://main.d3tqy4xj2yse0u.amplifyapp.com',
     'https://hairlyf.xyz',
@@ -82,7 +84,7 @@ app.use(globalErrorHandler);
 swaggerDocs(app);
 
 // Start Server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} 🚀`);
   console.log(`Swagger Docs available at http://localhost:${PORT}/api-docs 📚`);
