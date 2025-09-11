@@ -34,6 +34,7 @@ import express from "express";
 import {
   registerUser,
   verifyOtp,
+  resendOtp,
   loginWithEmail,
   verifyEmail,
   forgotPassword,
@@ -134,6 +135,35 @@ router.post("/register", registerUser);
  *         description: Too many attempts
  */
 router.post("/verify-otp", rateLimiter(5, 15 * 60), verifyOtp);
+
+/**
+ * @swagger
+ * /api/auth/resend-otp:
+ *   post:
+ *     summary: Resend OTP for account verification
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john@example.com"
+ *     responses:
+ *       200:
+ *         description: OTP resent successfully
+ *       404:
+ *         description: User not found
+ *       429:
+ *         description: Too many attempts
+ */
+router.post("/resend-otp", rateLimiter(5, 15 * 60), resendOtp);
 
 /**
  * @swagger
