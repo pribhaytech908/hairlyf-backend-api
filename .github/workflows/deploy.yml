@@ -31,4 +31,4 @@ jobs:
 
       - name: Run Docker container
         run: |
-          docker run -d -p 3000:3000 -e RAZORPAY_KEY_ID=your_key_id -e RAZORPAY_KEY_SECRET=your_key_secret --name my-node-app my-node-app
+          docker run -d -p 3000:3000 -e RAZORPAY_KEY_ID=rzp_test_6bLKr4BVxTpeRI -e RAZORPAY_KEY_SECRET=I8SllVW1cBGgXbIiEXWphUUJ --name my-node-app my-node-app
