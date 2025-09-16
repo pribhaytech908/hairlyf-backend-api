@@ -1,39 +1,34 @@
-name: Deploy Node.js app to EC2
+name: Deploy Node.js App
+
 on:
   push:
     branches:
      # - main
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  build-and-deploy:
+    runs-on: self-hosted   # 👈 Your own runner instead of GitHub-hosted
+
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Decode SSH key
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install --production
+
+      - name: Build Docker image
         run: |
-          echo "${{ secrets.EC2_SSH_KEY_B64 }}" | base64 -d > id_rsa
-          chmod 600 id_rsa
+          docker build -t my-node-app .
 
-      - name: Copy files to EC2
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key_path: id_rsa
-          source: "."
-          target: "/home/${{ secrets.EC2_USER }}/app"
+      - name: Stop old container (if running)
+        run: |
+          docker rm -f my-node-app || true
 
-      - name: SSH into EC2 and deploy Docker container
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key_path: id_rsa
-          script: |
-            cd /home/${{ secrets.EC2_USER }}/app
-            docker stop express-app || true
-            docker rm express-app || true
-            docker build -t express-app .
-            docker run -d --name express-app -p 80:3000 express-app
+      - name: Run Docker container
+        run: |
+          docker run -d -p 3000:3000 --name my-node-app my-node-app
