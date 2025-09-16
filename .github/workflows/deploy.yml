@@ -1,41 +1,39 @@
 name: Deploy Node.js app to EC2
-
 on:
   push:
     branches:
-      - main
+     # - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Decode SSH key
-      run: |
-        echo "${{ secrets.EC2_SSH_KEY_B64 }}" | base64 -d > id_rsa
-        chmod 600 id_rsa
+      - name: Decode SSH key
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY_B64 }}" | base64 -d > id_rsa
+          chmod 600 id_rsa
 
-    - name: Copy files to EC2
-      uses: appleboy/scp-action@v0.1.4
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key_path: id_rsa   # <-- use decoded key file
-        source: "."
-        target: "/home/${{ secrets.EC2_USER }}/app"
+      - name: Copy files to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key_path: id_rsa
+          source: "."
+          target: "/home/${{ secrets.EC2_USER }}/app"
 
-    - name: SSH into EC2 and deploy Docker container
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key_path: id_rsa   # <-- use decoded key file
-        script: |
-          cd /home/${{ secrets.EC2_USER }}/app
-          docker stop express-app || true
-          docker rm express-app || true
-          docker build -t express-app .
-          docker run -d --name express-app -p 80:3000 express-app
+      - name: SSH into EC2 and deploy Docker container
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key_path: id_rsa
+          script: |
+            cd /home/${{ secrets.EC2_USER }}/app
+            docker stop express-app || true
+            docker rm express-app || true
+            docker build -t express-app .
+            docker run -d --name express-app -p 80:3000 express-app
