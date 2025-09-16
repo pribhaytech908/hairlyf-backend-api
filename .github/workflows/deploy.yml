@@ -3,7 +3,7 @@ name: Deploy Node.js app to EC2
 on:
   push:
     branches:
-      # - main
+      - main
 
 jobs:
   deploy:
@@ -12,7 +12,7 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-      
+
     - name: Decode SSH key
       run: |
         echo "${{ secrets.EC2_SSH_KEY_B64 }}" | base64 -d > id_rsa
@@ -23,7 +23,7 @@ jobs:
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
-        key_path: id_rsa   # use decoded key file
+        key_path: id_rsa   # <-- use decoded key file
         source: "."
         target: "/home/${{ secrets.EC2_USER }}/app"
 
@@ -32,16 +32,10 @@ jobs:
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_SSH_KEY }}
+        key_path: id_rsa   # <-- use decoded key file
         script: |
           cd /home/${{ secrets.EC2_USER }}/app
-          
-          # Stop and remove any existing container
           docker stop express-app || true
           docker rm express-app || true
-
-          # Build new Docker image
           docker build -t express-app .
-
-          # Run new container (mapping port 80 on host to 3000 in container)
           docker run -d --name express-app -p 80:3000 express-app
