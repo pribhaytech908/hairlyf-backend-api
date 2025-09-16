@@ -1,4 +1,4 @@
-8name: Deploy Node.js app to EC2
+name: Deploy Node.js app to EC2
 
 on:
   push:
