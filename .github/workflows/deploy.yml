@@ -28,6 +28,8 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
+        RUN: echo "$EC2_SSH_KEY" > github-ec2.pem && chmod 600 github-ec2.pem && ssh -o StrictHostKeyChecking=no -i github-ec2.pem ${EC2_USER}@${EC2_HOST}'
+        echo "Current directory: $(pwd)" && echo "Listing home directory:"
         script: |
           cd /home/${{ secrets.EC2_USER }}/app
           
